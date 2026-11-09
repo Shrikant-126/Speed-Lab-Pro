@@ -1,0 +1,176 @@
+@import '@fontsource-variable/inter/index.css';
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-good: #0cce6b;
+  --color-ni: #ffa400;
+  --color-poor: #ff4e42;
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.04), 0 12px 32px -8px rgb(79 70 229 / 0.18);
+  --animate-fade-up: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  body {
+    @apply min-h-screen bg-slate-50 text-slate-700 dark:bg-[#070b17] dark:text-slate-300;
+    background-image:
+      radial-gradient(1200px 600px at 100% -10%, rgb(99 102 241 / 0.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgb(168 85 247 / 0.06), transparent 60%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    background-image:
+      radial-gradient(1200px 600px at 100% -10%, rgb(99 102 241 / 0.16), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgb(168 85 247 / 0.1), transparent 60%);
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200/70 bg-white/90 backdrop-blur-sm dark:border-white/[0.07] dark:bg-slate-900/60;
+    box-shadow: var(--shadow-soft);
+  }
+  .card-hover {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 dark:hover:border-brand-500/30;
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-lift);
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-100;
+  }
+  .label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-600 via-violet-600 to-fuchsia-500 bg-clip-text text-transparent dark:from-brand-300 dark:via-violet-300 dark:to-fuchsia-300;
+  }
+  .hero-surface {
+    @apply relative overflow-hidden rounded-3xl border border-white/10 text-white;
+    background:
+      radial-gradient(700px 300px at 85% 0%, rgb(236 72 153 / 0.35), transparent 60%),
+      radial-gradient(600px 300px at 0% 100%, rgb(56 189 248 / 0.25), transparent 60%),
+      linear-gradient(135deg, #4338ca 0%, #6d28d9 55%, #7c3aed 100%);
+    box-shadow: 0 20px 50px -20px rgb(79 70 229 / 0.6);
+  }
+  .hero-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse at 70% 20%, black, transparent 70%);
+    pointer-events: none;
+  }
+  .table {
+    @apply w-full text-left text-sm;
+  }
+  .table th {
+    @apply border-b border-slate-200 bg-slate-50/80 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:rounded-tl-lg last:rounded-tr-lg dark:border-white/[0.07] dark:bg-white/[0.02] dark:text-slate-400;
+  }
+  .table td {
+    @apply border-b border-slate-100 px-3 py-3 align-top dark:border-white/[0.05];
+  }
+  .table tbody tr {
+    @apply transition-colors;
+  }
+  .table tbody tr:hover td {
+    @apply bg-brand-50/40 dark:bg-brand-500/[0.04];
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .code-scroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .code-scroll::-webkit-scrollbar-thumb {
+    @apply rounded bg-slate-600/50;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: shimmer 1.4s infinite;
+}
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after,
+  .animate-fade-up,
+  .animate-float {
+    animation: none !important;
+  }
+}

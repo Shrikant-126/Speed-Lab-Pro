@@ -1,0 +1,28 @@
+{
+  "name": "@speedlab/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Analysis engine, code generators, URL safety and storage shared by the API, worker and client",
+  "exports": {
+    "./thresholds": "./src/thresholds.js",
+    "./analysis": "./src/analysis/index.js",
+    "./codegen": "./src/codegen/index.js",
+    "./net": "./src/net/index.js",
+    "./store": "./src/store/index.js",
+    "./upload": "./src/upload/index.js",
+    "./format": "./src/format.js",
+    "./images": "./src/images/convert.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "csso": "^5.0.5",
+    "ipaddr.js": "^2.2.0",
+    "jszip": "^3.10.1",
+    "terser": "^5.36.0",
+    "undici": "^6.21.0"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
+  }
+}

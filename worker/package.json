@@ -1,0 +1,27 @@
+{
+  "name": "@speedlab/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SpeedLab Pro analysis worker: PageSpeed Insights, CrUX, Lighthouse, Playwright + CDP inspection and Sharp image probing",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./jobs": "./src/jobs.js"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@speedlab/shared": "1.0.0",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0"
+  },
+  "optionalDependencies": {
+    "chrome-launcher": "^1.1.2",
+    "lighthouse": "^12.2.1",
+    "playwright": "^1.49.0",
+    "sharp": "^0.33.5"
+  }
+}
