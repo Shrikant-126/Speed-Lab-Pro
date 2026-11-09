@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
+
+// Build output goes to <repo root>/dist so Vercel finds it with the default "dist" setting.
+const outDir = fileURLToPath(new URL('../dist', import.meta.url));
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -12,6 +16,8 @@ export default defineConfig({
     },
   },
   build: {
+    outDir,
+    emptyOutDir: true,
     target: 'es2020',
     sourcemap: false,
     chunkSizeWarningLimit: 700,

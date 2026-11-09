@@ -28,7 +28,7 @@ The worker must use the same Supabase credentials as the API, because it saves t
 
 ## 3. Frontend + API on Vercel
 
-1. Import the repository in Vercel (root directory = repo root). `vercel.json` already configures the install/build commands, `client/dist` output, the `/api/*` function and SPA rewrites.
+1. Import the repository in Vercel (root directory = repo root). `vercel.json` already configures the install/build commands, `dist` output (repo root), the `/api/*` function and SPA rewrites.
 2. Environment variables:
 
 | Variable | Scope |
@@ -53,5 +53,5 @@ Notes:
 npm install && npm run browsers && npm run build
 NODE_ENV=production WORKER_SECRET=... npm run start:worker    # :8787
 WORKER_URL=http://localhost:8787 WORKER_SECRET=... npm run start:server   # :8080
-# serve client/dist with nginx and proxy /api to :8080
+# serve dist/ with nginx and proxy /api to :8080
 ```

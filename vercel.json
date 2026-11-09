@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install --workspace @speedlab/shared --workspace @speedlab/server --workspace @speedlab/client --include-workspace-root",
   "buildCommand": "npm run build -w @speedlab/client",
-  "outputDirectory": "client/dist",
+  "framework": null,
+  "outputDirectory": "dist",
   "functions": {
     "api/index.js": { "maxDuration": 30, "memory": 1024 }
   },
