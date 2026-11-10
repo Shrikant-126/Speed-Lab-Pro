@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/data
+.env
+.env.*
+!.env.example
+.git
+.vercel
+api
+docs
+*.log
+# Only the manifests of the web workspaces are needed (for npm workspace resolution)
+client/*
+!client/package.json
+server/*
+!server/package.json

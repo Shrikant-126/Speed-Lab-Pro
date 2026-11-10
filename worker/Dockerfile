@@ -1,15 +1,21 @@
 # SpeedLab Pro worker – Playwright + Chromium + Sharp (+ optional local Lighthouse)
 # Build from the repository root:  docker build -f worker/Dockerfile -t speedlab-worker .
-FROM mcr.microsoft.com/playwright:v1.49.0-noble
+# The base image version MUST match the "playwright" version in package-lock.json,
+# because the image already contains the matching Chromium build in /ms-playwright.
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
 
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    DATA_DIR=/tmp/speedlab-data
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY worker/package.json worker/
+COPY server/package.json server/
+COPY client/package.json client/
 RUN npm install --workspace @speedlab/shared --workspace @speedlab/worker --omit=dev --no-audit --no-fund \
- && npx playwright install chromium
+ && npm cache clean --force
 
 COPY shared shared
 COPY worker worker
