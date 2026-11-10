@@ -541,3 +541,4 @@ export { buildResourceHints } from './resourceHints.js';
 export { detectHosting } from './hosting.js';
 export { buildDelayCode, DELAY_SCRIPTS, TRIGGERS } from './delayLoader.js';
 export { buildWpPlugin, WP_FEATURES, WP_DEFAULT_SETTINGS } from './wpPlugin.js';
+export { imagePriorityPlan, PRIORITY_ACTIONS } from './imagePriority.js';

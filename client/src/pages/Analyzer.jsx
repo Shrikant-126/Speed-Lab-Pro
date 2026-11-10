@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { api } from '../lib/api.js';
 import { Card, CardHeader, Button, ProgressBar, ErrorState, Notice, Badge, IconChip, cx } from '../components/ui.jsx';
 import ScoreGauge from '../components/ScoreGauge.jsx';
+import ScanMeter from '../components/ScanMeter.jsx';
 import { formatMetric } from '@speedlab/shared/format';
 import { rateMetric } from '@speedlab/shared/thresholds';
 
@@ -18,6 +19,18 @@ const STEP_ICON = {
 };
 
 function JobProgress({ job }) {
+  if (['queued', 'running'].includes(job.status)) {
+    return (
+      <Card className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          {job.strategy === 'mobile' ? <Smartphone size={16} /> : <Monitor size={16} />}
+          <span className="font-semibold capitalize">{job.strategy}</span>
+          <Badge tone="brand">{job.status === 'queued' ? `queued${job.queuePosition ? ` #${job.queuePosition}` : ''}` : 'scanning'}</Badge>
+        </div>
+        <ScanMeter job={job} />
+      </Card>
+    );
+  }
   return (
     <Card className="p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

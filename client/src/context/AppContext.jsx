@@ -202,6 +202,8 @@ export function AppProvider({ children }) {
           status: 'running',
           progress: 5,
           strategy: s,
+          url: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+          startedAt: new Date().toISOString(),
           message: 'Analysing… PageSpeed Insights usually takes 20–60 seconds',
           steps: [],
           warnings: [],

@@ -5,6 +5,7 @@ import { formatBytes, shortUrl, fileName } from '@speedlab/shared/format';
 import { optimizedImageMarkup, shopifyImageLiquid, wordpressImagePhp, preloadTag } from '@speedlab/shared/codegen';
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
+import ImagePreloadPlan from '../components/ImagePreloadPlan.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Select, Tabs, Notice, EmptyState, KeyValue, Button } from '../components/ui.jsx';
 
@@ -123,6 +124,8 @@ function ImagesPage({ report, onConvert }) {
         <Stat label="With issues" value={totals.withIssues ?? 0} />
         <Stat label="Potential savings" value={formatBytes(totals.potentialSavings)} hint={report.sources?.imageProbe ? 'Measured with Sharp where available' : 'Estimate'} tone="text-emerald-600 dark:text-emerald-400" />
       </div>
+
+      <ImagePreloadPlan report={report} />
 
       {sel && <ImageDetail img={sel} report={report} onClose={() => setSelected(null)} onConvert={onConvert} />}
 
