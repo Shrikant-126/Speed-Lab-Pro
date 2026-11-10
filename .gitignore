@@ -8,3 +8,7 @@ worker/data/
 .vercel/
 *.log
 .DS_Store
+
+.vercel
+.env*
+supabase/.temp/

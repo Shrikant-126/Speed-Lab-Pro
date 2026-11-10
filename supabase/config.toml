@@ -1,0 +1,12 @@
+# Supabase project settings managed from this repo.
+# Only the properties declared here are pushed (`npx supabase config push`); everything else
+# stays as configured in the Supabase dashboard.
+project_id = "speedlab-pro"
+
+[auth]
+# Where confirmation / magic-link / password-reset emails send users.
+site_url = "https://speed-lab-pro-shri-personal1.vercel.app"
+additional_redirect_urls = [
+  "https://speed-lab-pro-shri-personal1.vercel.app/**",
+  "http://localhost:5173/**",
+]
