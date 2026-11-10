@@ -1,6 +1,11 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SearchCheck, CheckCircle2, AlertTriangle, XCircle, Info, ChevronDown, ExternalLink, RotateCcw, Tags, FileJson, Globe, Share2, ListTree, ShieldCheck } from 'lucide-react';
+import { SearchCheck, CheckCircle2, AlertTriangle, XCircle, Info, ChevronDown, ExternalLink, RotateCcw, Tags, FileJson, Globe, Share2, ListTree, ShieldCheck, FileSpreadsheet, Upload, ClipboardList } from 'lucide-react';
+import { exportSeoExcel, importSeoExcel, loadTracking, saveTracking } from '../lib/seoExcel.js';
+import { downloadBlob } from '../lib/api.js';
+
+const TrackingContext = createContext({});
+const PROGRESS_TONE = { Open: 'slate', 'In progress': 'blue', Done: 'green', "Won't fix": 'amber' };
 import RequireReport from '../components/RequireReport.jsx';
 import ScoreGauge from '../components/ScoreGauge.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
@@ -17,6 +22,7 @@ const SEV_TONE = { critical: 'red', high: 'orange', medium: 'amber', low: 'blue'
 
 function CheckRow({ c, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen);
+  const t = useContext(TrackingContext)[c.id];
   const S = STATUS[c.status] || STATUS.info;
   return (
     <div className="border-b border-slate-100 last:border-0 dark:border-white/[0.05]">
@@ -26,6 +32,7 @@ function CheckRow({ c, defaultOpen }) {
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium text-slate-900 dark:text-white">{c.title}</p>
             {c.severity && c.status !== 'pass' && <Badge tone={SEV_TONE[c.severity]} className="capitalize">{c.severity}</Badge>}
+            {t?.progress && <Badge tone={PROGRESS_TONE[t.progress]}>{t.progress}{t.owner ? ` · ${t.owner}` : ''}</Badge>}
           </div>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{c.detail}</p>
         </div>
@@ -124,9 +131,94 @@ function SeoPage({ report }) {
     ['Facebook Sharing Debugger', `https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(report.finalUrl)}`],
   ];
 
+  const [tracking, setTracking] = useState(() => loadTracking(report.finalUrl));
+  const [imported, setImported] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [excelError, setExcelError] = useState(null);
+  const fileRef = useRef(null);
+
+  const doExport = async () => {
+    setBusy('export');
+    setExcelError(null);
+    try {
+      const { blob, filename } = await exportSeoExcel(report);
+      downloadBlob(blob, filename);
+    } catch (e) {
+      setExcelError(`Export failed: ${e.message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const doImport = async (file) => {
+    setBusy('import');
+    setExcelError(null);
+    try {
+      const { rows, url } = await importSeoExcel(file);
+      if (!rows.length) throw new Error('No rows with an ID were found in the "SEO checks" sheet');
+      const next = { ...tracking };
+      for (const r of rows) next[r.id] = { progress: r.progress, owner: r.owner, due: r.due, notes: r.notes };
+      setTracking(next);
+      saveTracking(report.finalUrl, next);
+      setImported({ rows, url, file: file.name });
+    } catch (e) {
+      setExcelError(e.message);
+    } finally {
+      setBusy(null);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+  const statusById = Object.fromEntries(groups.all.map((c) => [c.id, c.status]));
+
   return (
+    <TrackingContext.Provider value={tracking}>
     <div className="space-y-6">
-      <PageHeader icon={SearchCheck} title="SEO & Analytics" description="On-page SEO, indexing and crawlability, social previews, structured data validation and Google Tag Manager / GA4 / consent-mode checks — each with a fix and ready-to-use code." />
+      <PageHeader
+        icon={SearchCheck}
+        title="SEO & Analytics"
+        description="On-page SEO, indexing and crawlability, social previews, structured data validation and Google Tag Manager / GA4 / consent-mode checks — each with a fix and ready-to-use code."
+        actions={
+          <>
+            <Button variant="secondary" icon={FileSpreadsheet} loading={busy === 'export'} onClick={doExport}>Export Excel</Button>
+            <Button variant="secondary" icon={Upload} loading={busy === 'import'} onClick={() => fileRef.current?.click()}>Import Excel</Button>
+            <input ref={fileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => e.target.files[0] && doImport(e.target.files[0])} />
+          </>
+        }
+      />
+      {excelError && <Notice tone="warn">{excelError}</Notice>}
+      {imported && (
+        <Card>
+          <CardHeader
+            icon={ClipboardList}
+            title={`Imported tracking – ${imported.file}`}
+            subtitle={`${imported.rows.length} rows · ${imported.rows.filter((r) => r.progress === 'Done').length} done · ${imported.rows.filter((r) => r.progress === 'In progress').length} in progress${imported.url && imported.url !== report.finalUrl ? ` · exported for ${imported.url}` : ''}`}
+            actions={<Button size="sm" variant="ghost" onClick={() => setImported(null)}>Close</Button>}
+          />
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead><tr><th>Check</th><th>Progress</th><th>Owner</th><th>Due</th><th>Latest scan</th><th>Notes</th></tr></thead>
+              <tbody>
+                {imported.rows.map((r) => {
+                  const now = statusById[r.id];
+                  const flag = r.progress === 'Done' && ['fail', 'warn'].includes(now) ? 'Marked done but still failing' : r.progress !== 'Done' && now === 'pass' ? 'Now passing – mark as done' : null;
+                  return (
+                    <tr key={r.id}>
+                      <td className="font-medium">{r.title || r.id}</td>
+                      <td><Badge tone={PROGRESS_TONE[r.progress]}>{r.progress}</Badge></td>
+                      <td>{r.owner || '—'}</td>
+                      <td className="whitespace-nowrap">{r.due || '—'}</td>
+                      <td>
+                        {now ? <Badge tone={now === 'pass' ? 'green' : now === 'fail' ? 'red' : now === 'warn' ? 'amber' : 'slate'}>{now}</Badge> : <span className="text-xs text-slate-400">not in this scan</span>}
+                        {flag && <p className={cx('mt-1 text-xs', flag.startsWith('Marked') ? 'text-red-500' : 'text-emerald-600')}>{flag}</p>}
+                      </td>
+                      <td className="max-w-[320px] text-xs text-slate-600 dark:text-slate-400">{r.notes || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       {!seo.htmlAvailable && <Notice tone="warn">The page HTML could not be downloaded for this scan, so most SEO checks are unavailable.</Notice>}
 
       <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
@@ -249,6 +341,7 @@ function SeoPage({ report }) {
         ]}
       />
     </div>
+    </TrackingContext.Provider>
   );
 }
 

@@ -8,6 +8,9 @@ import SnippetViewer from '../components/SnippetViewer.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { PageHeader, Tabs, Card, CardHeader, Select, Button, EmptyState, ErrorState, Notice, PriorityBadge, Badge, Collapsible, Spinner } from '../components/ui.jsx';
 import { Link } from 'react-router-dom';
+import HostingPlugins from '../components/codegen/HostingPlugins.jsx';
+import DelayBuilder from '../components/codegen/DelayBuilder.jsx';
+import WpPluginBuilder from '../components/codegen/WpPluginBuilder.jsx';
 
 // ---------------------------------------------------------------- From scan
 function FromScan({ report }) {
@@ -377,11 +380,29 @@ function UploadProject() {
 
 export default function CodeGenerator() {
   const { report, reportsLoading } = useApp();
-  const [tab, setTab] = useState('scan');
+  const [tab, setTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return ['scan', 'platform', 'hosting', 'delay', 'plugin', 'upload'].includes(t) ? t : 'scan';
+  });
   return (
     <div>
-      <PageHeader icon={Code2} title="Code Generator" description="Generate optimized HTML, CSS, JavaScript, Shopify Liquid and WordPress code, or optimize an uploaded project." />
-      <Tabs className="mb-5" tabs={[{ key: 'scan', label: 'From scan' }, { key: 'platform', label: 'Platform optimizer' }, { key: 'upload', label: 'Upload project' }]} value={tab} onChange={setTab} />
+      <PageHeader icon={Code2} title="Code Generator" description="Generate optimized HTML, CSS, JavaScript, Shopify Liquid and WordPress code, delay third-party scripts, build a WordPress optimisation plugin, or optimize an uploaded project." />
+      <Tabs
+        className="mb-5"
+        tabs={[
+          { key: 'scan', label: 'From scan' },
+          { key: 'platform', label: 'Platform optimizer' },
+          { key: 'hosting', label: 'Hosting & plugins' },
+          { key: 'delay', label: 'Delay / lazy scripts' },
+          { key: 'plugin', label: 'WordPress plugin' },
+          { key: 'upload', label: 'Upload project' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      {tab === 'hosting' && (reportsLoading ? <Spinner /> : <HostingPlugins report={report} />)}
+      {tab === 'delay' && (reportsLoading ? <Spinner /> : <DelayBuilder key={report?.id || 'none'} report={report} />)}
+      {tab === 'plugin' && (reportsLoading ? <Spinner /> : <WpPluginBuilder key={report?.id || 'none'} report={report} />)}
       {tab === 'upload' && <UploadProject />}
       {tab === 'platform' && (reportsLoading ? <Spinner /> : <PlatformOptimizer report={report} />)}
       {tab === 'scan' && (reportsLoading ? <Spinner /> : report ? <FromScan key={report.id} report={report} /> : (

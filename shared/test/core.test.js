@@ -159,3 +159,31 @@ test('SEO & analytics validation from HTML', async () => {
   assert.equal(byId['gtm-install'].status, 'warn', 'noscript missing');
   assert.ok(s.issues.some((i) => i.type === 'seo-indexable' && i.priority === 'critical'));
 });
+
+test('hosting detection, delay loader and WordPress plugin generator', async () => {
+  const { detectHosting, buildDelayCode, buildWpPlugin } = await import('../src/codegen/index.js');
+  const wpe = detectHosting({ platform: { name: 'wordpress', label: 'WordPress' }, network: { document: { headers: { 'wpe-backend': 'apache', server: 'nginx' } } } });
+  assert.equal(wpe.key, 'wpengine');
+  assert.ok(wpe.avoid.some((a) => /W3 Total Cache/.test(a.name)));
+  const ls = detectHosting({ platform: { name: 'wordpress' }, network: { document: { headers: { server: 'LiteSpeed', 'x-litespeed-cache': 'hit' } } } });
+  assert.equal(ls.key, 'litespeed');
+  assert.equal(ls.recommended[0].name, 'LiteSpeed Cache');
+  assert.equal(detectHosting({ platform: { name: 'shopify' } }).key, 'shopify');
+
+  const d = buildDelayCode([{ key: 'gtm', id: 'GTM-ABC1234' }, { key: 'recaptcha3', id: '6LcABCDEFGHIJKLMNOPQRSTU', selector: '#quote-form' }], { consentMode: true });
+  assert.match(d.script, /gtm\.js\?id=GTM-ABC1234/);
+  assert.match(d.script, /onFocus\("#quote-form"/);
+  assert.ok(d.markup.some((m) => /ns\.html\?id=GTM-ABC1234/.test(m.code)), 'GTM noscript markup');
+  assert.ok(d.markup.some((m) => /id="quote-form"/.test(m.code)), 'form id markup');
+  assert.match(d.head, /consent', 'default'/);
+  assert.match(d.php, /add_action\( 'wp_footer'/);
+
+  const p = buildWpPlugin(['lazy_images', 'minify_html'], { pluginName: "My Shop's Speed" }, { cachePlugin: 'WP Rocket' });
+  const main = p.files[`${p.slug}/${p.slug}.php`];
+  assert.equal(p.slug, 'my-shops-speed');
+  assert.match(main, /Plugin Name:\s+My Shops Speed/);
+  assert.match(main, /speedlab_lazy_content/);
+  assert.match(main, /speedlab_minify_html/);
+  assert.doesNotMatch(main, /speedlab_delay_buffer/, 'unselected feature not included');
+  assert.ok(p.warnings.some((w) => /WP Rocket/.test(w)));
+});

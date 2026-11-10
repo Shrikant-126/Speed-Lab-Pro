@@ -538,3 +538,6 @@ export function snippetsToText(issue, snippets) {
 export { optimizedImageMarkup, preloadTag, shopifyImageLiquid, wordpressImagePhp } from './images.js';
 export { wordpressEnvNotes } from './wordpress.js';
 export { buildResourceHints } from './resourceHints.js';
+export { detectHosting } from './hosting.js';
+export { buildDelayCode, DELAY_SCRIPTS, TRIGGERS } from './delayLoader.js';
+export { buildWpPlugin, WP_FEATURES, WP_DEFAULT_SETTINGS } from './wpPlugin.js';
