@@ -18,7 +18,8 @@
     "start:server": "npm run start -w server",
     "start:worker": "npm run start -w worker",
     "test": "node --test \"shared/test/*.test.js\"",
-    "browsers": "npx playwright install chromium"
+    "browsers": "npx playwright install chromium",
+    "create-user": "node --env-file=.env scripts/create-user.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
