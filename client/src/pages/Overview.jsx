@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Smartphone, Monitor, Lightbulb, RefreshCw, Image as ImageIcon, FileCode2, Palette, Puzzle } from 'lucide-react';
+import { ArrowRight, Smartphone, Monitor, Lightbulb, RefreshCw, ScanSearch, Image as ImageIcon, FileCode2, Palette, Puzzle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useApp } from '../context/AppContext.jsx';
 import RequireReport from '../components/RequireReport.jsx';
@@ -65,7 +65,10 @@ export default function Overview() {
                   </div>
                   <div className="mt-6 flex flex-wrap gap-2">
                     <Link to="/suggestions"><Button variant="white" icon={Lightbulb}>View {report.issues.length} fixes</Button></Link>
-                    <Link to="/analyzer"><Button variant="ghost" className="text-white hover:bg-white/10 dark:text-white" icon={RefreshCw}>New scan</Button></Link>
+                    <Link to={`/analyzer?url=${encodeURIComponent(report.finalUrl)}&strategy=${report.strategy}&run=1`}>
+                      <Button variant="ghost" className="border border-white/30 text-white hover:bg-white/10 dark:text-white" icon={RefreshCw}>Retest</Button>
+                    </Link>
+                    <Link to="/analyzer"><Button variant="ghost" className="text-white/80 hover:bg-white/10 dark:text-white/80" icon={ScanSearch}>New scan</Button></Link>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur sm:grid-cols-4">

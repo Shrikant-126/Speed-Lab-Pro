@@ -87,6 +87,10 @@ export function AppProvider({ children }) {
   const [device, setDeviceState] = useState(() => readLS(LS_DEVICE, 'mobile'));
   const [reportsLoading, setReportsLoading] = useState(true);
   const [reportsError, setReportsError] = useState(null);
+  // Previous scan of the same URL+device, recorded when a retest starts (for before/after compare).
+  const [baselines, setBaselines] = useState({});
+  const reportsRef = useRef(reports);
+  reportsRef.current = reports;
   const setDevice = (d) => {
     setDeviceState(d);
     writeLS(LS_DEVICE, d);
@@ -173,8 +177,24 @@ export function AppProvider({ children }) {
   useEffect(() => () => clearInterval(pollRef.current), []);
 
   const startScan = useCallback(
-    async ({ url, strategy, projectId }) => {
+    async ({ url, strategy, projectId, baselineId }) => {
       setScanError(null);
+      const sameSite = (a, b) => {
+        try {
+          const x = new URL(a);
+          const y = new URL(/^https?:\/\//i.test(b) ? b : `https://${b}`);
+          return x.host.replace(/^www\./, '') === y.host.replace(/^www\./, '') && x.pathname.replace(/\/$/, '') === y.pathname.replace(/\/$/, '');
+        } catch {
+          return false;
+        }
+      };
+      const nextBaselines = {};
+      for (const s of strategy === 'both' ? ['mobile', 'desktop'] : [strategy]) {
+        const prev = reportsRef.current[s];
+        if (baselineId && strategy !== 'both') nextBaselines[s] = baselineId;
+        else if (prev?.id && sameSite(prev.finalUrl || prev.url, url)) nextBaselines[s] = prev.id;
+      }
+      setBaselines(nextBaselines);
       try {
         // Show placeholder progress while an inline (Vercel Lite) scan runs inside the request.
         const pending = (strategy === 'both' ? ['mobile', 'desktop'] : [strategy]).map((s) => ({
@@ -247,10 +267,11 @@ export function AppProvider({ children }) {
       scanError,
       startScan,
       cancelScan,
+      baselines,
       defaultStrategy: readLS(LS_DEFAULT_STRATEGY, 'mobile'),
       setDefaultStrategy: (s) => writeLS(LS_DEFAULT_STRATEGY, s),
     }),
-    [theme, session, authReady, health, healthError, refreshHealth, reports, report, device, reportsLoading, reportsError, loadScan, putReport, jobs, scanning, scanError, startScan, cancelScan],
+    [theme, session, authReady, health, healthError, refreshHealth, reports, report, device, reportsLoading, reportsError, loadScan, putReport, jobs, scanning, scanError, startScan, cancelScan, baselines],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

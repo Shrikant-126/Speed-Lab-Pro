@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { History as HistoryIcon, Trash2, ExternalLink, GitCompare, Search, FolderPlus, X, Smartphone, Monitor } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { History as HistoryIcon, Trash2, ExternalLink, GitCompare, Search, FolderPlus, X, Smartphone, Monitor, RotateCcw } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { METRICS } from '@speedlab/shared/thresholds';
 import { formatBytes, formatMetric, shortUrl } from '@speedlab/shared/format';
@@ -163,8 +163,9 @@ function Projects({ projects, reload }) {
 }
 
 export default function History() {
-  const { loadScan } = useApp();
+  const { loadScan, scanning } = useApp();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [rows, setRows] = useState(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState(null);
@@ -220,19 +221,35 @@ export default function History() {
       setError(e.message);
     }
   };
-  const runCompare = async () => {
-    const sorted = rows.filter((r) => selected.includes(r.id)).sort((x, y) => Date.parse(x.created_at) - Date.parse(y.created_at));
-    const ids = sorted.length === 2 ? sorted.map((r) => r.id) : selected;
+  const compareIds = async (a, b) => {
     setComparing(true);
     setError(null);
     try {
-      setCompare(await api(`/scans/compare?a=${ids[0]}&b=${ids[1]}`));
+      setCompare(await api(`/scans/compare?a=${a}&b=${b}`));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       setError(e.message);
     } finally {
       setComparing(false);
     }
   };
+  const runCompare = async () => {
+    const sorted = rows.filter((r) => selected.includes(r.id)).sort((x, y) => Date.parse(x.created_at) - Date.parse(y.created_at));
+    const ids = sorted.length === 2 ? sorted.map((r) => r.id) : selected;
+    await compareIds(ids[0], ids[1]);
+  };
+  // /history?a=<before>&b=<after> opens the comparison directly (used after a retest).
+  useEffect(() => {
+    const a = params.get('a');
+    const b = params.get('b');
+    if (a && b && /^[0-9a-f-]{36}$/i.test(a) && /^[0-9a-f-]{36}$/i.test(b)) {
+      setSelected([a, b]);
+      compareIds(a, b);
+      setParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const retest = (r) => navigate(`/analyzer?url=${encodeURIComponent(r.final_url || r.url)}&strategy=${r.strategy}&base=${r.id}&run=1`);
 
   return (
     <div className="space-y-6">
@@ -272,7 +289,8 @@ export default function History() {
                     <td className="text-right tabular-nums">{formatBytes(r.total_bytes)}</td>
                     <td className="text-right tabular-nums">{r.issue_count ?? '—'}</td>
                     <td className="whitespace-nowrap text-right">
-                      <Button size="sm" variant="secondary" icon={ExternalLink} loading={opening === r.id} onClick={() => open(r.id)}>Open</Button>
+                      <Button size="sm" variant="secondary" icon={ExternalLink} loading={opening === r.id} onClick={() => open(r.id)}>Open</Button>{' '}
+                      <Button size="sm" variant="secondary" icon={RotateCcw} disabled={scanning} onClick={() => retest(r)} title="Scan this URL again">Retest</Button>
                       <Button size="sm" variant="ghost" icon={Trash2} onClick={() => remove(r.id)} aria-label="Delete scan" />
                     </td>
                   </tr>

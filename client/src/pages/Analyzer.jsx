@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Sparkles, Globe, Gauge, Code2, ShieldCheck, ScanSearch, Smartphone, Monitor, Layers, XCircle, CheckCircle2, Circle, Loader2, MinusCircle, AlertTriangle, ArrowRight, Ban } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Sparkles, Globe, Gauge, Code2, ShieldCheck, ScanSearch, Smartphone, Monitor, Layers, XCircle, CheckCircle2, Circle, Loader2, MinusCircle, AlertTriangle, ArrowRight, Ban, RotateCcw, GitCompare } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { api } from '../lib/api.js';
 import { Card, CardHeader, Button, ProgressBar, ErrorState, Notice, Badge, IconChip, cx } from '../components/ui.jsx';
@@ -53,7 +53,7 @@ function JobProgress({ job }) {
   );
 }
 
-function ResultSummary({ report }) {
+function ResultSummary({ report, baselineId, onRetest, scanning }) {
   if (!report) return null;
   const s = report.scores;
   return (
@@ -62,6 +62,18 @@ function ResultSummary({ report }) {
         title={<span className="capitalize">{report.strategy} results</span>}
         subtitle={`${report.finalUrl} · ${new Date(report.createdAt).toLocaleString()}`}
         icon={report.strategy === 'mobile' ? Smartphone : Monitor}
+        actions={
+          <>
+            {baselineId && report.id && baselineId !== report.id && (
+              <Link to={`/history?a=${baselineId}&b=${report.id}`}>
+                <Button size="sm" icon={GitCompare}>Compare with previous scan</Button>
+              </Link>
+            )}
+            <Button size="sm" variant="secondary" icon={RotateCcw} disabled={scanning} onClick={() => onRetest(report)}>
+              Retest
+            </Button>
+          </>
+        }
       />
       <div className="grid grid-cols-2 gap-6 p-6 sm:grid-cols-4">
         <ScoreGauge score={s.performance} label="Performance" />
@@ -94,17 +106,49 @@ function ResultSummary({ report }) {
 }
 
 export default function Analyzer() {
-  const { startScan, cancelScan, jobs, scanning, scanError, reports, defaultStrategy, health } = useApp();
-  const [url, setUrl] = useState('');
-  const [strategy, setStrategy] = useState(defaultStrategy || 'mobile');
+  const { startScan, cancelScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines } = useApp();
+  const [params, setParams] = useSearchParams();
+  const [url, setUrl] = useState(() => params.get('url') || '');
+  const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'mobile'));
   const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
+  const autoRan = useRef(null);
 
   useEffect(() => {
     api('/projects').then(setProjects).catch(() => setProjects([]));
   }, []);
+
+  const run = async (value, strat, baselineId) => {
+    setLocalError(null);
+    setSubmitting(true);
+    try {
+      await startScan({ url: value, strategy: strat, projectId, baselineId });
+    } catch {
+      /* scanError is set in context */
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // /analyzer?url=…&strategy=…&run=1 starts a retest automatically (used by Retest buttons).
+  useEffect(() => {
+    const key = params.toString();
+    if (params.get('run') !== '1' || !params.get('url') || autoRan.current === key || scanning) return;
+    autoRan.current = key;
+    const base = /^[0-9a-f-]{36}$/i.test(params.get('base') || '') ? params.get('base') : undefined;
+    setParams({}, { replace: true });
+    run(params.get('url'), strategy, base);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  const retest = (r) => {
+    setUrl(r.finalUrl || r.url);
+    setStrategy(r.strategy);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    run(r.finalUrl || r.url, r.strategy);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -117,14 +161,7 @@ export default function Analyzer() {
     } catch {
       return setLocalError('Enter a valid public URL, e.g. https://example.com');
     }
-    setSubmitting(true);
-    try {
-      await startScan({ url: value, strategy, projectId });
-    } catch {
-      /* scanError is set in context */
-    } finally {
-      setSubmitting(false);
-    }
+    await run(value, strategy);
   };
 
   const doneStrategies = jobs.filter((j) => j.status === 'done').map((j) => j.strategy);
@@ -195,7 +232,7 @@ export default function Analyzer() {
       )}
 
       {doneStrategies.map((s) => (
-        <ResultSummary key={s} report={reports[s]} />
+        <ResultSummary key={s} report={reports[s]} baselineId={baselines?.[s]} onRetest={retest} scanning={scanning} />
       ))}
 
       {jobs.length > 1 && reports.mobile && reports.desktop && doneStrategies.length === 2 && (
@@ -227,6 +264,27 @@ export default function Analyzer() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </Card>
+      )}
+
+      {!jobs.length && (reports.mobile || reports.desktop) && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <IconChip icon={RotateCcw} tone="blue" size={16} />
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-white">Made changes? Retest your last scan</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Run the same URL again and compare before vs after.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {['mobile', 'desktop'].filter((k) => reports[k]).map((k) => (
+                <Button key={k} variant="secondary" icon={k === 'mobile' ? Smartphone : Monitor} onClick={() => retest(reports[k])} title={reports[k].finalUrl}>
+                  Retest {(() => { try { return new URL(reports[k].finalUrl).host; } catch { return ''; } })()} ({k})
+                </Button>
+              ))}
+            </div>
           </div>
         </Card>
       )}
