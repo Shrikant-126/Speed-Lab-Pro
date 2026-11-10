@@ -18,15 +18,15 @@ export function Card({ className, children, hover = false, ...rest }) {
 
 export function IconChip({ icon: Icon, tone = 'brand', size = 16, className }) {
   const tones = {
-    brand: 'from-brand-500 to-violet-600 shadow-brand-500/30',
-    green: 'from-emerald-400 to-teal-600 shadow-emerald-500/30',
-    amber: 'from-amber-400 to-orange-500 shadow-amber-500/30',
-    red: 'from-rose-500 to-red-600 shadow-rose-500/30',
-    blue: 'from-sky-400 to-blue-600 shadow-sky-500/30',
-    pink: 'from-fuchsia-500 to-pink-600 shadow-fuchsia-500/30',
+    brand: 'from-brand-300 to-brand-500 text-[#04090a] shadow-brand-500/40',
+    green: 'from-emerald-400 to-teal-600 text-white shadow-emerald-500/30',
+    amber: 'from-amber-400 to-orange-500 text-white shadow-amber-500/30',
+    red: 'from-rose-500 to-red-600 text-white shadow-rose-500/30',
+    blue: 'from-teal-400 to-cyan-600 text-white shadow-teal-500/30',
+    pink: 'from-fuchsia-500 to-pink-600 text-white shadow-fuchsia-500/30',
   };
   return (
-    <div className={cx('flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br p-2 text-white shadow-lg', tones[tone] || tones.brand, className)}>
+    <div className={cx('flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br p-2 shadow-lg', tones[tone] || tones.brand, className)}>
       <Icon size={size} />
     </div>
   );
@@ -48,10 +48,10 @@ export function CardHeader({ title, subtitle, icon: Icon, actions, className }) 
 }
 
 const BTN = {
-  primary: 'bg-gradient-to-r from-brand-600 to-violet-600 text-white shadow-md shadow-brand-600/25 hover:shadow-lg hover:shadow-brand-600/35 hover:brightness-110 active:scale-[0.98]',
+  primary: 'bg-gradient-to-r from-brand-300 to-brand-400 text-[#04090a] font-semibold shadow-md shadow-brand-500/30 hover:shadow-lg hover:shadow-brand-400/50 hover:brightness-105 active:scale-[0.98]',
   secondary: 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]',
   ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/[0.06]',
-  white: 'bg-white text-brand-700 shadow-lg shadow-black/10 hover:bg-brand-50 active:scale-[0.98]',
+  white: 'bg-brand-300 font-semibold text-[#04090a] shadow-lg shadow-brand-400/30 hover:bg-brand-200 active:scale-[0.98]',
   danger: 'bg-red-600 text-white hover:bg-red-700',
   'danger-outline': 'border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10',
 };
@@ -178,7 +178,7 @@ export function Tabs({ tabs, value, onChange, className }) {
           onClick={() => onChange(t.key)}
           className={cx(
             'rounded-lg px-3 py-1.5 text-sm font-medium transition',
-            value === t.key ? 'bg-white text-brand-700 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-800 dark:text-white dark:ring-white/10' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+            value === t.key ? 'bg-white text-brand-700 shadow-sm ring-1 ring-slate-200/70 dark:bg-brand-300 dark:text-[#04090a] dark:ring-brand-300/40 dark:shadow-brand-400/20' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
           )}
         >
           {t.label}
@@ -211,7 +211,7 @@ export function ProgressBar({ value, className, tone = 'brand' }) {
 }
 
 export function Stat({ label, value, hint, tone, icon: Icon, accent = 'brand' }) {
-  const bar = { brand: 'from-brand-500 to-violet-500', green: 'from-emerald-400 to-teal-500', amber: 'from-amber-400 to-orange-500', red: 'from-rose-500 to-red-500', blue: 'from-sky-400 to-blue-500', pink: 'from-fuchsia-500 to-pink-500' };
+  const bar = { brand: 'from-brand-500 to-teal-400', green: 'from-emerald-400 to-teal-500', amber: 'from-amber-400 to-orange-500', red: 'from-rose-500 to-red-500', blue: 'from-sky-400 to-blue-500', pink: 'from-fuchsia-500 to-pink-500' };
   return (
     <div className="card card-hover relative overflow-hidden p-4">
       <div className={cx('absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r', bar[accent] || bar.brand)} />
@@ -219,7 +219,7 @@ export function Stat({ label, value, hint, tone, icon: Icon, accent = 'brand' })
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
         {Icon && <Icon size={16} className="text-slate-300 dark:text-slate-600" />}
       </div>
-      <p className={cx('mt-1.5 text-2xl font-bold tabular-nums tracking-tight', tone || 'text-slate-900 dark:text-white')}>{value}</p>
+      <p className={cx('num mt-1.5 text-[28px] leading-tight', tone || 'text-slate-900 dark:text-white')}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
     </div>
   );

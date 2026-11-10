@@ -179,14 +179,14 @@ export default function Analyzer() {
   return (
     <div className="space-y-6">
       <section className="hero-surface animate-fade-up px-5 py-8 sm:px-10 sm:py-12">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-fuchsia-400/30 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
         <div className="relative max-w-3xl">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur">
             <Sparkles size={13} /> Lighthouse · CrUX field data · Playwright · Sharp
           </span>
           <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight sm:text-[42px]">
-            How fast is your website <span className="bg-gradient-to-r from-amber-200 via-pink-200 to-sky-200 bg-clip-text text-transparent">really?</span>
+            How fast is your website <span className="bg-gradient-to-r from-brand-200 via-brand-300 to-teal-200 bg-clip-text text-transparent">really?</span>
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/75 sm:text-base">
             Get real Core Web Vitals, an exact LCP breakdown, and prioritised fixes with ready-to-paste HTML, CSS, JavaScript, Shopify Liquid and WordPress code.

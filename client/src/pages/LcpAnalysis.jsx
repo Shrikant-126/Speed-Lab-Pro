@@ -7,7 +7,7 @@ import MetricCard from '../components/MetricCard.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { Card, CardHeader, PageHeader, KeyValue, Badge, EmptyState, Notice, SourceTag } from '../components/ui.jsx';
 
-const PHASE_COLORS = { ttfb: '#6366f1', loadDelay: '#f59e0b', loadDuration: '#0ea5e9', renderDelay: '#ef4444' };
+const PHASE_COLORS = { ttfb: '#c2ee2a', loadDelay: '#f59e0b', loadDuration: '#0ea5e9', renderDelay: '#ef4444' };
 
 const CHECKS = [
   ['lazyLoaded', 'Not lazy-loaded', false],

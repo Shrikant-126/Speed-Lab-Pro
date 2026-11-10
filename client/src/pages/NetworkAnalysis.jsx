@@ -7,8 +7,8 @@ import IssueCard from '../components/IssueCard.jsx';
 import { Card, CardHeader, PageHeader, KeyValue, Notice, Badge, Select, EmptyState, Stat, SourceTag } from '../components/ui.jsx';
 
 const TYPE_COLORS = {
-  document: '#6366f1',
-  css: '#a855f7',
+  document: '#c2ee2a',
+  css: '#2dd4bf',
   js: '#f59e0b',
   image: '#10b981',
   font: '#ec4899',
@@ -20,8 +20,8 @@ const TYPE_COLORS = {
 const PHASES = [
   ['redirectMs', 'Redirects', '#94a3b8'],
   ['dnsMs', 'DNS lookup', '#0ea5e9'],
-  ['tcpMs', 'TCP connect', '#6366f1'],
-  ['tlsMs', 'TLS handshake', '#a855f7'],
+  ['tcpMs', 'TCP connect', '#c2ee2a'],
+  ['tlsMs', 'TLS handshake', '#2dd4bf'],
   ['requestToFirstByteMs', 'Server wait', '#f59e0b'],
   ['downloadMs', 'HTML download', '#10b981'],
 ];

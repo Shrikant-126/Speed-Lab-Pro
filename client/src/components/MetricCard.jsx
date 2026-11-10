@@ -19,9 +19,15 @@ export default function MetricCard({ metric, value, source = 'lab', compact = fa
         </div>
         <SourceTag kind={value === null || value === undefined ? 'unavailable' : source} />
       </div>
-      <p className={cx('mt-3 font-extrabold tabular-nums tracking-tight', compact ? 'text-[28px]' : 'text-4xl')} style={{ color: RATING_COLOR[rating] }}>
-        {formatMetric(metric, value)}
-      </p>
+      {(() => {
+        const [num, unit] = value === null || value === undefined ? ['—'] : formatMetric(metric, value).split(' ');
+        return (
+          <p className={cx('num mt-3 leading-none', compact ? 'text-[40px]' : 'text-5xl')} style={{ color: rating === 'unavailable' ? undefined : RATING_COLOR[rating] }}>
+            {num}
+            {unit && <span className="ml-1 text-base font-normal text-slate-400">{unit}</span>}
+          </p>
+        );
+      })()}
       <div className="mt-1">
         <RatingBadge rating={rating} />
       </div>
@@ -31,7 +37,7 @@ export default function MetricCard({ metric, value, source = 'lab', compact = fa
           <div className="bg-[#ffa400]" style={{ width: `${((m.poor - m.good) / max) * 100}%` }} />
           <div className="flex-1 bg-[#ff4e42]" />
         </div>
-        {pos !== null && <div className="absolute -top-1 h-3.5 w-1 rounded bg-slate-900 dark:bg-white" style={{ left: `calc(${pos}% - 2px)` }} />}
+        {pos !== null && <div className="absolute -top-[5px] h-4 w-4 rounded-full border-[3px] border-white bg-slate-900 dark:border-[#04090a] dark:bg-white" style={{ left: `calc(${pos}% - 8px)`, boxShadow: `0 0 12px ${RATING_COLOR[rating]}` }} />}
         <div className="mt-1.5 flex justify-between text-[11px] text-slate-400">
           <span>Good ≤ {formatMetric(metric, m.good)}</span>
           <span>Poor &gt; {formatMetric(metric, m.poor)}</span>

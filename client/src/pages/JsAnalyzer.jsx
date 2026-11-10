@@ -40,7 +40,7 @@ function JsPage({ report }) {
                   <XAxis type="number" tickFormatter={(v) => formatMs(v)} stroke="#94a3b8" fontSize={12} />
                   <YAxis type="category" dataKey="group" width={150} stroke="#94a3b8" fontSize={11} />
                   <Tooltip formatter={(v) => formatMs(v)} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
-                  <Bar dataKey="ms" name="Time" fill="#6366f1" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="ms" name="Time" fill="#c2ee2a" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

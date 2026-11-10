@@ -30,7 +30,7 @@ export function AppProvider({ children }) {
   // ---- Theme
   const [theme, setThemeState] = useState(() => {
     try {
-      return localStorage.getItem(LS_THEME) || 'system';
+      return localStorage.getItem(LS_THEME) || 'dark';
     } catch {
       return 'system';
     }

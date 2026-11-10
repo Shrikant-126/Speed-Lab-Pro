@@ -6,21 +6,23 @@
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace;
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
+  /* Fluorescent lime brand (inspired by sports dashboards) */
+  --color-brand-50: #f8ffe6;
+  --color-brand-100: #efffc4;
+  --color-brand-200: #e0fd8d;
+  --color-brand-300: #d1f74f;
+  --color-brand-400: #c2ee2a;
+  --color-brand-500: #a6d414;
+  --color-brand-600: #7fa60c;
+  --color-brand-700: #5f7e0f;
+  --color-brand-800: #4b6312;
+  --color-brand-900: #3e5314;
+  --color-ink: #04090a;
   --color-good: #0cce6b;
   --color-ni: #ffa400;
   --color-poor: #ff4e42;
   --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.04), 0 12px 32px -8px rgb(79 70 229 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.04), 0 12px 32px -8px rgb(166 212 20 / 0.22);
   --animate-fade-up: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-float: float 6s ease-in-out infinite;
 }
@@ -52,16 +54,16 @@
     font-feature-settings: 'cv11', 'ss01';
   }
   body {
-    @apply min-h-screen bg-slate-50 text-slate-700 dark:bg-[#070b17] dark:text-slate-300;
+    @apply min-h-screen bg-slate-50 text-slate-700 dark:bg-[#04090a] dark:text-slate-300;
     background-image:
-      radial-gradient(1200px 600px at 100% -10%, rgb(99 102 241 / 0.08), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgb(168 85 247 / 0.06), transparent 60%);
+      radial-gradient(1200px 600px at 100% -10%, rgb(166 212 20 / 0.09), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgb(20 184 166 / 0.08), transparent 60%);
     background-attachment: fixed;
   }
   .dark body {
     background-image:
-      radial-gradient(1200px 600px at 100% -10%, rgb(99 102 241 / 0.16), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgb(168 85 247 / 0.1), transparent 60%);
+      radial-gradient(1100px 600px at 100% -10%, rgb(194 238 42 / 0.07), transparent 60%),
+      radial-gradient(1000px 700px at -10% 110%, rgb(13 148 136 / 0.18), transparent 60%);
   }
   h1,
   h2,
@@ -83,8 +85,24 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200/70 bg-white/90 backdrop-blur-sm dark:border-white/[0.07] dark:bg-slate-900/60;
+    @apply rounded-3xl border border-slate-200/70 bg-white/85 backdrop-blur-xl dark:border-white/[0.07];
     box-shadow: var(--shadow-soft);
+  }
+  /* Dark glass: translucent ink with a soft teal glow from the bottom, like the reference UI */
+  .dark .card {
+    background:
+      radial-gradient(120% 70% at 85% 120%, rgb(13 148 136 / 0.22), transparent 60%),
+      linear-gradient(180deg, rgb(15 23 25 / 0.82), rgb(8 14 16 / 0.82));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px -24px rgb(0 0 0 / 0.8);
+  }
+  .glass {
+    @apply border border-white/15 bg-white/10 backdrop-blur-xl;
+  }
+  .glow-lime {
+    box-shadow: 0 0 0 1px rgb(194 238 42 / 0.35), 0 0 24px rgb(194 238 42 / 0.35);
+  }
+  .num {
+    @apply font-light tracking-tight tabular-nums;
   }
   .card-hover {
     @apply transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 dark:hover:border-brand-500/30;
@@ -99,15 +117,15 @@
     @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400;
   }
   .gradient-text {
-    @apply bg-gradient-to-r from-brand-600 via-violet-600 to-fuchsia-500 bg-clip-text text-transparent dark:from-brand-300 dark:via-violet-300 dark:to-fuchsia-300;
+    @apply bg-gradient-to-r from-brand-600 via-emerald-500 to-teal-500 bg-clip-text text-transparent dark:from-brand-300 dark:via-brand-200 dark:to-teal-300;
   }
   .hero-surface {
     @apply relative overflow-hidden rounded-3xl border border-white/10 text-white;
     background:
-      radial-gradient(700px 300px at 85% 0%, rgb(236 72 153 / 0.35), transparent 60%),
-      radial-gradient(600px 300px at 0% 100%, rgb(56 189 248 / 0.25), transparent 60%),
-      linear-gradient(135deg, #4338ca 0%, #6d28d9 55%, #7c3aed 100%);
-    box-shadow: 0 20px 50px -20px rgb(79 70 229 / 0.6);
+      radial-gradient(700px 320px at 90% -10%, rgb(194 238 42 / 0.28), transparent 60%),
+      radial-gradient(700px 420px at 0% 120%, rgb(20 184 166 / 0.45), transparent 62%),
+      linear-gradient(160deg, #0b2a2c 0%, #071618 55%, #04090a 100%);
+    box-shadow: 0 24px 60px -24px rgb(13 148 136 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.06);
   }
   .hero-surface::before {
     content: '';

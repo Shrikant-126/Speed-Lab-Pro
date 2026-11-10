@@ -52,7 +52,7 @@ function SidebarScore() {
   const { report } = useApp();
   if (!report) {
     return (
-      <Link to="/analyzer" className="mx-3 mb-4 block rounded-2xl bg-gradient-to-br from-brand-600 to-violet-600 p-4 text-white shadow-lg shadow-brand-600/30 transition hover:brightness-110">
+      <Link to="/analyzer" className="mx-3 mb-4 block rounded-2xl bg-gradient-to-br from-brand-600 to-teal-500 p-4 text-white shadow-lg shadow-brand-500/30 transition hover:brightness-110">
         <p className="text-sm font-semibold">Start your first scan</p>
         <p className="mt-0.5 text-xs text-white/75">Analyze any public URL in under a minute.</p>
       </Link>
@@ -156,8 +156,8 @@ export default function Layout() {
     <nav className="flex h-full flex-col">
       <Link to="/" className="flex items-center gap-3 px-5 pb-5 pt-6">
         <div className="relative">
-          <div className="absolute inset-0 rounded-xl bg-brand-500 opacity-50 blur-md" />
-          <div className="relative rounded-xl bg-gradient-to-br from-brand-500 via-violet-600 to-fuchsia-600 p-2 text-white">
+          <div className="absolute inset-0 rounded-xl bg-brand-400 opacity-40 blur-md" />
+          <div className="relative rounded-xl bg-[#04090a] p-2 text-brand-300 ring-1 ring-brand-400/40">
             <Zap size={18} fill="currentColor" />
           </div>
         </div>
@@ -183,14 +183,14 @@ export default function Layout() {
                     cx(
                       'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium transition',
                       isActive
-                        ? 'bg-gradient-to-r from-brand-50 to-violet-50/40 text-brand-700 dark:from-brand-500/15 dark:to-transparent dark:text-white'
+                        ? 'bg-gradient-to-r from-brand-100/70 to-teal-50/40 text-brand-700 dark:from-brand-500/15 dark:to-transparent dark:text-white'
                         : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-100',
                     )
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-brand-500 to-violet-500" />}
+                      {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-brand-500 to-teal-400" />}
                       <Icon size={17} className={cx('transition', isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300')} />
                       <span className="flex-1 truncate">{label}</span>
                       {badge === 'issues' && report?.issues?.length > 0 && (

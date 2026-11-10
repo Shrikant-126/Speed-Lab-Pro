@@ -70,7 +70,7 @@ function Comparison({ data, onClose }) {
                 <Tooltip formatter={(v) => `${v} KB`} />
                 <Legend />
                 <Bar dataKey="Before" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="After" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="After" fill="#c2ee2a" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
