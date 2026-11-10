@@ -72,21 +72,28 @@ export default function Overview() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur sm:grid-cols-4">
-                  {[['Performance', report.scores.performance], ['Accessibility', report.scores.accessibility], ['Best Practices', report.scores.bestPractices], ['SEO', report.scores.seo]].map(([l, v], i) => (
-                    <div key={l} className="flex flex-col items-center gap-2">
-                      <div className="rounded-full bg-white p-1.5 shadow-lg dark:bg-slate-900">
-                        <ScoreGauge score={v} size={i === 0 ? 96 : 80} />
-                      </div>
-                      <span className="text-xs font-medium text-white/85">{l}</span>
-                    </div>
-                  ))}
+                  {[['Performance', report.scores.performance, '/core-web-vitals'], ['Accessibility', report.scores.accessibility, null], ['Best Practices', report.scores.bestPractices, null], ['SEO', report.scores.seo, '/seo']].map(([l, v, to], i) => {
+                    const inner = (
+                      <>
+                        <div className="rounded-full bg-white p-1.5 shadow-lg transition group-hover:scale-105 dark:bg-slate-900">
+                          <ScoreGauge score={v} size={i === 0 ? 96 : 80} />
+                        </div>
+                        <span className="text-xs font-medium text-white/85 group-hover:text-white">{l}{to ? ' →' : ''}</span>
+                      </>
+                    );
+                    return to ? (
+                      <Link key={l} to={to} className="group flex flex-col items-center gap-2" title={`Open ${l} details`}>{inner}</Link>
+                    ) : (
+                      <div key={l} className="flex flex-col items-center gap-2">{inner}</div>
+                    );
+                  })}
                 </div>
               </div>
             </section>
-            {report.warnings?.length > 0 && (
+            {report.warnings?.filter((w) => !w.startsWith('Lite scan (Vercel)')).length > 0 && (
               <Notice tone="warn">
                 <ul className="list-disc space-y-0.5 pl-4">
-                  {report.warnings.map((w) => (
+                  {report.warnings.filter((w) => !w.startsWith('Lite scan (Vercel)')).map((w) => (
                     <li key={w}>{w}</li>
                   ))}
                 </ul>

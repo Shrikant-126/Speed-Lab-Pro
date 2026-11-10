@@ -242,6 +242,16 @@ export function AppProvider({ children }) {
 
   const scanning = jobs.some((j) => ['queued', 'running'].includes(j.status));
 
+  // Clear the analyzer (progress cards, errors). Loaded reports stay available in the dashboard.
+  const resetScan = useCallback(() => {
+    clearInterval(pollRef.current);
+    pollRef.current = null;
+    startAbort.current?.abort();
+    setJobs([]);
+    setScanError(null);
+    setBaselines({});
+  }, []);
+
   const value = useMemo(
     () => ({
       theme,
@@ -267,11 +277,12 @@ export function AppProvider({ children }) {
       scanError,
       startScan,
       cancelScan,
+      resetScan,
       baselines,
       defaultStrategy: readLS(LS_DEFAULT_STRATEGY, 'mobile'),
       setDefaultStrategy: (s) => writeLS(LS_DEFAULT_STRATEGY, s),
     }),
-    [theme, session, authReady, health, healthError, refreshHealth, reports, report, device, reportsLoading, reportsError, loadScan, putReport, jobs, scanning, scanError, startScan, cancelScan, baselines],
+    [theme, session, authReady, health, healthError, refreshHealth, reports, report, device, reportsLoading, reportsError, loadScan, putReport, jobs, scanning, scanError, startScan, cancelScan, resetScan, baselines],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

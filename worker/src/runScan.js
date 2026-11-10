@@ -1,7 +1,7 @@
 // Scan orchestration: runs all collectors (in parallel where possible), builds the
 // normalised report and stores it.
 
-import { validatePublicUrl, runPageSpeed, fetchCrux, probeDocument } from '@speedlab/shared/net';
+import { validatePublicUrl, runPageSpeed, fetchCrux, probeDocument, probeSeoFiles } from '@speedlab/shared/net';
 import { buildReport } from '@speedlab/shared/analysis';
 import { getStore } from '@speedlab/shared/store';
 import { inspectPage, playwrightAvailable } from './collectors/browser.js';
@@ -12,7 +12,7 @@ export const SCAN_STEPS = [
   { key: 'validate', label: 'Validating URL & SSRF checks' },
   { key: 'lighthouse', label: 'Lighthouse / PageSpeed Insights' },
   { key: 'field', label: 'Chrome UX Report field data' },
-  { key: 'probe', label: 'Server, TTFB & header analysis' },
+  { key: 'probe', label: 'Server, TTFB, SEO, robots.txt & sitemap' },
   { key: 'browser', label: 'Browser inspection (Playwright + CDP)' },
   { key: 'images', label: 'Image analysis (Sharp)' },
   { key: 'analysis', label: 'Building diagnostics & recommendations' },
@@ -113,6 +113,8 @@ export async function runScan(payload, { signal, update }) {
     }
   })();
 
+  const seoFilesTask = probeSeoFiles(url, { signal }).catch(() => null);
+
   const probeTask = (async () => {
     update({ step: 'probe', status: 'running' });
     try {
@@ -132,13 +134,14 @@ export async function runScan(payload, { signal, update }) {
   const browserTask = (async () => {
     if (!browserEnabled || !(await playwrightAvailable())) {
       update({ step: 'browser', status: 'skipped' });
-      warn(
-        process.env.VERCEL
-          ? 'Lite scan (Vercel): browser inspection is not available here, so element-level image, video, CSS/JS coverage and event-listener diagnostics are limited to what Lighthouse reports. Run SpeedLab locally (npm run dev) or connect a worker for full scans.'
-          : browserEnabled
+      // On Vercel this is the expected "Lite" mode – reported via report.mode, not as a warning.
+      if (!process.env.VERCEL) {
+        warn(
+          browserEnabled
             ? 'Playwright/Chromium is not installed on the worker – element-level image, video, coverage and listener diagnostics are unavailable. Run "npm run browsers".'
             : 'Browser inspection disabled (DISABLE_BROWSER=true).',
-      );
+        );
+      }
       tick(20);
       return null;
     }
@@ -157,7 +160,7 @@ export async function runScan(payload, { signal, update }) {
     }
   })();
 
-  const [lh, crux, probe, inspection] = await Promise.all([lighthouseTask, cruxTask, probeTask, browserTask]);
+  const [lh, crux, probe, inspection, seoFiles] = await Promise.all([lighthouseTask, cruxTask, probeTask, browserTask, seoFilesTask]);
   throwIfAborted(signal);
 
   if (!lh.lhr && !inspection) {
@@ -198,8 +201,10 @@ export async function runScan(payload, { signal, update }) {
     probe,
     inspection,
     imageProbe,
+    seoFiles,
     warnings,
   });
+  report.mode = inspection ? 'full' : process.env.VERCEL ? 'lite' : 'no-browser';
   update({ step: 'analysis', status: 'done', progress: 94 });
 
   // 5) Save ---------------------------------------------------------------------

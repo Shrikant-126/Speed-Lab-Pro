@@ -147,6 +147,21 @@
   }
 }
 
+/* Browser autofill paints inputs light blue/white; keep them on-theme (e.g. the hero URL box in dark mode). */
+.url-input:-webkit-autofill,
+.input:-webkit-autofill {
+  -webkit-text-fill-color: #0f172a;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  caret-color: #0f172a;
+  transition: background-color 9999s ease-out 0s;
+}
+.dark .url-input:-webkit-autofill,
+.dark .input:-webkit-autofill {
+  -webkit-text-fill-color: #f1f5f9;
+  box-shadow: 0 0 0 1000px #0f172a inset;
+  caret-color: #f1f5f9;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

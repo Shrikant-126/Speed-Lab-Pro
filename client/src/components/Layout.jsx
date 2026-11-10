@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, ScanSearch, Activity, Target, Image, Video, Palette, FileCode2, Network, Puzzle,
-  Lightbulb, Code2, History, FileText, Settings, Menu, X, Sun, Moon, Monitor, Smartphone, Zap, Loader2, LogIn, LogOut,
+  Lightbulb, Code2, History, FileText, Settings, SearchCheck, Menu, X, Sun, Moon, Monitor, Smartphone, Zap, Loader2, LogIn, LogOut,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { cx, PageSkeleton } from './ui.jsx';
@@ -27,6 +27,7 @@ export const NAV_GROUPS = [
       { to: '/javascript', label: 'JavaScript Analyzer', icon: FileCode2 },
       { to: '/network', label: 'Network Analysis', icon: Network },
       { to: '/third-party', label: 'Third-Party Scripts', icon: Puzzle },
+      { to: '/seo', label: 'SEO & Analytics', icon: SearchCheck },
     ],
   },
   {

@@ -13,6 +13,7 @@ import { analyzeNetwork } from './network.js';
 import { analyzeThirdParty } from './thirdParty.js';
 import { analyzeCls } from './cls.js';
 import { detectPlatform } from './platform.js';
+import { analyzeSeo } from './seo.js';
 import { PRIORITY_WEIGHT } from '../thresholds.js';
 
 export const REPORT_VERSION = 1;
@@ -51,6 +52,7 @@ export function buildReport(input) {
   const thirdParty = analyzeThirdParty({ lhr, requests, inspection });
   const cls = analyzeCls({ lhr, inspection, clsValue: lab.cls.value ?? field?.metrics?.cls?.p75 });
   const platform = detectPlatform({ html: probe?.html || '', headers: probe?.headers || {}, requests });
+  const seo = analyzeSeo({ lhr, probe, seoFiles: input.seoFiles, requests, finalUrl, platform });
 
   const issues = [
     ...lcp.issues,
@@ -61,6 +63,7 @@ export function buildReport(input) {
     ...network.issues,
     ...thirdParty.issues,
     ...cls.issues,
+    ...seo.issues,
   ];
   // Deduplicate by id and sort by priority then savings.
   const seen = new Set();
@@ -104,6 +107,7 @@ export function buildReport(input) {
     network: strip(network),
     thirdParty: strip(thirdParty),
     cls: strip(cls),
+    seo: strip(seo),
     platform,
     resources: { summary: resourceSummary, requests: requests.slice(0, 400) },
     issues: uniqueIssues,

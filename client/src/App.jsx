@@ -14,6 +14,7 @@ const CssAnalyzer = lazy(() => import('./pages/CssAnalyzer.jsx'));
 const JsAnalyzer = lazy(() => import('./pages/JsAnalyzer.jsx'));
 const NetworkAnalysis = lazy(() => import('./pages/NetworkAnalysis.jsx'));
 const ThirdParty = lazy(() => import('./pages/ThirdParty.jsx'));
+const SeoAnalyzer = lazy(() => import('./pages/SeoAnalyzer.jsx'));
 const Suggestions = lazy(() => import('./pages/Suggestions.jsx'));
 const CodeGenerator = lazy(() => import('./pages/CodeGenerator.jsx'));
 const History = lazy(() => import('./pages/History.jsx'));
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="javascript" element={<JsAnalyzer />} />
           <Route path="network" element={<NetworkAnalysis />} />
           <Route path="third-party" element={<ThirdParty />} />
+          <Route path="seo" element={<SeoAnalyzer />} />
           <Route path="suggestions" element={<Suggestions />} />
           <Route path="code-generator" element={<CodeGenerator />} />
           <Route path="history" element={<History />} />

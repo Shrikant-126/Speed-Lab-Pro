@@ -136,3 +136,26 @@ test('upload optimizer: path safety, proposals, approval-only application, backu
   assert.match(await zip.file('optimized/style.css').async('string'), /font-display: swap/);
   assert.ok(zip.file('CHANGES.md'));
 });
+
+test('SEO & analytics validation from HTML', async () => {
+  const { analyzeSeo } = await import('../src/analysis/seo.js');
+  const html = `<!doctype html><html><head><title>Hi</title>
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];})(window,document,'script','dataLayer','GTM-ABC1234');</script>
+  <script src="https://www.googletagmanager.com/gtm.js?id=GTM-ABC1234"></script>
+  <script>dataLayer = [{page:'x'}];</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Shoe","offers":{"@type":"Offer","price":"10"}}</script>
+  <script type="application/ld+json">{bad json}</script>
+  <meta name="robots" content="noindex"></head><body><h1>A</h1><h1>B</h1><h4>C</h4><img src="a.jpg"><a href="#">x</a></body></html>`;
+  const s = analyzeSeo({ probe: { html, headers: {}, statusCode: 200 }, seoFiles: null, requests: [], finalUrl: 'https://shop.example.com/p', platform: null });
+  const byId = Object.fromEntries([...s.checks, ...s.tagChecks].map((c) => [c.id, c]));
+  assert.equal(byId.indexable.status, 'fail', 'noindex detected');
+  assert.equal(byId['meta-description'].status, 'fail');
+  assert.equal(byId.h1.status, 'warn', 'two H1s');
+  assert.equal(byId.title.status, 'warn', 'too short');
+  assert.equal(byId['structured-data'].status, 'fail', 'invalid JSON + missing priceCurrency');
+  assert.ok(s.structuredData.blocks[0].nodes[0].errors.some((e) => /priceCurrency/.test(e)));
+  assert.deepEqual(s.analytics.gtm, ['GTM-ABC1234']);
+  assert.equal(byId.datalayer.status, 'fail', 'dataLayer reset after GTM');
+  assert.equal(byId['gtm-install'].status, 'warn', 'noscript missing');
+  assert.ok(s.issues.some((i) => i.type === 'seo-indexable' && i.priority === 'critical'));
+});

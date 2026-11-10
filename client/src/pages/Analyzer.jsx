@@ -42,9 +42,9 @@ function JobProgress({ job }) {
         ))}
       </ul>
       {job.error && <ErrorState title="Scan failed" message={job.error.message} />}
-      {job.warnings?.length > 0 && (
+      {job.warnings?.filter((w) => !w.startsWith('Lite scan (Vercel)')).length > 0 && (
         <div className="mt-4 space-y-2">
-          {job.warnings.map((w) => (
+          {job.warnings.filter((w) => !w.startsWith('Lite scan (Vercel)')).map((w) => (
             <Notice key={w} tone="warn">{w}</Notice>
           ))}
         </div>
@@ -106,7 +106,7 @@ function ResultSummary({ report, baselineId, onRetest, scanning }) {
 }
 
 export default function Analyzer() {
-  const { startScan, cancelScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines } = useApp();
+  const { startScan, cancelScan, resetScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines } = useApp();
   const [params, setParams] = useSearchParams();
   const [url, setUrl] = useState(() => params.get('url') || '');
   const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'mobile'));
@@ -142,6 +142,15 @@ export default function Analyzer() {
     run(params.get('url'), strategy, base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+
+  const reset = () => {
+    resetScan();
+    setUrl('');
+    setLocalError(null);
+    setSubmitting(false);
+    setStrategy(defaultStrategy || 'mobile');
+    document.getElementById('url')?.focus();
+  };
 
   const retest = (r) => {
     setUrl(r.finalUrl || r.url);
@@ -183,18 +192,31 @@ export default function Analyzer() {
             Get real Core Web Vitals, an exact LCP breakdown, and prioritised fixes with ready-to-paste HTML, CSS, JavaScript, Shopify Liquid and WordPress code.
           </p>
         </div>
-        <form onSubmit={submit} className="relative mt-7 max-w-3xl space-y-4">
-          <div className="flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-2xl shadow-black/20 md:flex-row dark:bg-slate-900">
-            <div className="flex flex-1 items-center gap-2 px-3">
-              <Globe size={18} className="shrink-0 text-slate-400" />
-              <label htmlFor="url" className="sr-only">Website URL</label>
-              <input id="url" className="w-full bg-transparent py-2.5 text-[15px] text-slate-900 placeholder-slate-400 outline-none dark:text-white" placeholder="https://www.yourstore.com" value={url} onChange={(e) => setUrl(e.target.value)} disabled={scanning} autoComplete="url" inputMode="url" />
+        <form onSubmit={submit} className="relative mt-7 max-w-4xl space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex flex-1 flex-col gap-2 rounded-2xl bg-white p-2 shadow-2xl shadow-black/20 md:flex-row dark:bg-slate-900">
+              <div className="flex flex-1 items-center gap-2 px-3">
+                <Globe size={18} className="shrink-0 text-slate-400" />
+                <label htmlFor="url" className="sr-only">Website URL</label>
+                <input id="url" className="url-input w-full bg-transparent py-2.5 text-[15px] text-slate-900 placeholder-slate-400 outline-none dark:text-white" placeholder="https://www.yourstore.com" value={url} onChange={(e) => setUrl(e.target.value)} disabled={scanning} autoComplete="url" inputMode="url" />
+              </div>
+              {scanning ? (
+                <Button variant="danger" size="lg" icon={XCircle} onClick={cancelScan}>Cancel scan</Button>
+              ) : (
+                <Button type="submit" size="lg" icon={ScanSearch} loading={submitting}>Analyze now</Button>
+              )}
             </div>
-            {scanning ? (
-              <Button variant="danger" size="lg" icon={XCircle} onClick={cancelScan}>Cancel scan</Button>
-            ) : (
-              <Button type="submit" size="lg" icon={ScanSearch} loading={submitting}>Analyze now</Button>
-            )}
+            <Button
+              variant="ghost"
+              size="lg"
+              icon={RotateCcw}
+              onClick={reset}
+              disabled={!url && !jobs.length && !localError && !scanError}
+              className="border border-white/30 bg-white/10 text-white backdrop-blur hover:bg-white/20 dark:text-white"
+              title="Clear the URL, progress and errors"
+            >
+              Reset
+            </Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex rounded-xl border border-white/20 bg-white/10 p-1 backdrop-blur" role="radiogroup" aria-label="Device">
@@ -218,6 +240,11 @@ export default function Analyzer() {
         </form>
       </section>
       {(localError || scanError) && <ErrorState title="Cannot start scan" message={localError || scanError} />}
+      {health?.worker?.lite && (
+        <Notice>
+          <b>Online (Lite) mode:</b> scores, Core Web Vitals, real-user data, LCP, CSS/JS, third-party, SEO &amp; analytics checks all run here. Element-level browser checks (rendered image sizes, videos, event listeners) need the full local version (<code>npm run dev</code>).
+        </Notice>
+      )}
       {workerMissing && <Notice tone="warn">The scan worker is not available ({health?.worker?.error || 'WORKER_URL not configured'}). See Settings → System status.</Notice>}
       {health && health.integrations?.pagespeedApiKey === false && (
         <Notice>No PAGESPEED_API_KEY configured – PageSpeed Insights uses the small anonymous quota and may return HTTP 429. Add a key for reliable scans.</Notice>

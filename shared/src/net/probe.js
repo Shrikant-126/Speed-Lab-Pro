@@ -97,6 +97,80 @@ function parseCacheControl(value) {
   return out;
 }
 
+function robotsBlocks(robotsTxt, path) {
+  // Evaluate the most specific group for Googlebot, else "*". Longest matching rule wins.
+  const groups = [];
+  let current = null;
+  for (const raw of robotsTxt.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    if (!line) continue;
+    const [k, ...rest] = line.split(':');
+    const key = k.trim().toLowerCase();
+    const val = rest.join(':').trim();
+    if (key === 'user-agent') {
+      if (!current || current.rules.length) groups.push((current = { agents: [], rules: [] }));
+      current.agents.push(val.toLowerCase());
+    } else if ((key === 'allow' || key === 'disallow') && current) {
+      current.rules.push({ allow: key === 'allow', path: val });
+    }
+  }
+  const pick = groups.find((g) => g.agents.includes('googlebot')) || groups.find((g) => g.agents.includes('*'));
+  if (!pick) return { blocksAll: false, blocksPage: false, matchedRule: null };
+  const toRe = (p) => new RegExp(`^${p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')}`);
+  let best = null;
+  for (const r of pick.rules) {
+    if (!r.path) continue;
+    if (toRe(r.path).test(path) && (!best || r.path.length > best.path.length || (r.path.length === best.path.length && r.allow))) best = r;
+  }
+  return {
+    blocksAll: pick.rules.some((r) => !r.allow && r.path === '/') && !pick.rules.some((r) => r.allow && r.path === '/'),
+    blocksPage: !!best && !best.allow,
+    matchedRule: best ? `${best.allow ? 'Allow' : 'Disallow'}: ${best.path}` : null,
+  };
+}
+
+/** Fetch robots.txt and the XML sitemap for SEO checks. Never throws. */
+export async function probeSeoFiles(pageUrl, { signal } = {}) {
+  const u = new URL(pageUrl);
+  const origin = u.origin;
+  const out = { robots: null, sitemap: null };
+  try {
+    const { response } = await safeFetch(`${origin}/robots.txt`, { signal, timeoutMs: 10_000, maxRedirects: 3, headers: { accept: 'text/plain,*/*' } });
+    const text = response.ok ? (await readLimited(response, 512 * 1024)).toString('utf8') : (await response.body?.cancel().catch(() => {}), '');
+    const sitemaps = [...text.matchAll(/^\s*sitemap\s*:\s*(\S+)/gim)].map((m) => m[1]);
+    out.robots = { status: response.status, bytes: text.length, sitemaps, ...robotsBlocks(text, u.pathname + u.search), excerpt: text.slice(0, 1500) };
+  } catch (err) {
+    out.robots = { status: 0, error: err.message, sitemaps: [], blocksAll: false, blocksPage: false };
+  }
+  const candidates = [...new Set([...(out.robots?.sitemaps || []), `${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`, `${origin}/wp-sitemap.xml`])].slice(0, 4);
+  for (const sm of candidates) {
+    try {
+      const { response, url } = await safeFetch(sm, { signal, timeoutMs: 12_000, maxRedirects: 3, headers: { accept: 'application/xml,text/xml,*/*' } });
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {});
+        out.sitemap ||= { url: sm, ok: false, status: response.status };
+        continue;
+      }
+      let xml;
+      try {
+        xml = (await readLimited(response, 5 * 1024 * 1024)).toString('utf8');
+      } catch (e) {
+        xml = e.partial ? e.partial.toString('utf8') : '';
+      }
+      const isIndex = /<sitemapindex\b/i.test(xml);
+      const count = (xml.match(isIndex ? /<sitemap>/gi : /<url>/gi) || []).length;
+      if (/<(urlset|sitemapindex)\b/i.test(xml)) {
+        out.sitemap = { url, ok: count > 0, status: response.status, isIndex, count, error: count ? null : 'Sitemap has no entries' };
+        break;
+      }
+      out.sitemap ||= { url, ok: false, status: response.status, error: 'Not an XML sitemap' };
+    } catch (err) {
+      out.sitemap ||= { url: sm, ok: false, status: 0, error: err.message };
+    }
+  }
+  return out;
+}
+
 /** Probe the document URL. Never throws for HTTP errors; throws only for unsafe URLs. */
 export async function probeDocument(inputUrl, { signal, mobile = true } = {}) {
   const url = normalizeUrl(inputUrl).toString();

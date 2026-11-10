@@ -503,6 +503,13 @@ export function contextFromReport(report) {
 
 /** Generate all snippets for an issue. */
 export function generateFixes(issue, ctx = {}) {
+  if (issue?.type?.startsWith('seo-')) {
+    const c = issue.evidence?.seoCheck;
+    const out = [];
+    if (c?.code) out.push(S('html', c.codeLang === 'text' ? 'text' : 'html', c.title, c.group === 'Crawlability' ? 'robots.txt at the site root' : 'Inside <head> (or where noted)', '', c.code, [c.fix].filter(Boolean)));
+    if (c?.shopify) out.push(S('shopify', /^</.test(c.shopify) ? 'liquid' : 'text', `${c.title} – Shopify`, 'layout/theme.liquid', '', c.shopify));
+    return out;
+  }
   const gen = GENERATORS[issue?.type];
   if (!gen) return [];
   try {
