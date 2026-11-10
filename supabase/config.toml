@@ -5,8 +5,9 @@ project_id = "speedlab-pro"
 
 [auth]
 # Where confirmation / magic-link / password-reset emails send users.
-site_url = "https://speed-lab-pro-shri-personal1.vercel.app"
+site_url = "https://speed-lab-pro.vercel.app"
 additional_redirect_urls = [
+  "https://speed-lab-pro.vercel.app/**",
   "https://speed-lab-pro-shri-personal1.vercel.app/**",
   "http://localhost:5173/**",
 ]
