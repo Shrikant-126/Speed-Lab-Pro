@@ -28,11 +28,9 @@ router.post('/jobs', requireUser, scanLimiter, async (req, res, next) => {
     checkUrlStructure(normalized);
     const safe = await validatePublicUrl(normalized); // DNS check up-front for a fast error
     if (projectId && !UUID.test(projectId)) return res.status(400).json({ error: 'Invalid projectId' });
-    const jobs = [];
-    for (const s of strategies) {
-      jobs.push(publicJob(await createJob({ url: safe, strategy: s, userId: req.user.id, projectId })));
-    }
-    return res.status(202).json({ jobs });
+    // Parallel so "both" stays within the function time limit in inline (Vercel Lite) mode.
+    const jobs = (await Promise.all(strategies.map((s) => createJob({ url: safe, strategy: s, userId: req.user.id, projectId })))).map(publicJob);
+    return res.status(jobs.every((j) => j.status === 'done' || j.status === 'error') ? 200 : 202).json({ jobs });
   } catch (err) {
     return next(err);
   }

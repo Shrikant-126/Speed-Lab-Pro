@@ -132,7 +132,13 @@ export async function runScan(payload, { signal, update }) {
   const browserTask = (async () => {
     if (!browserEnabled || !(await playwrightAvailable())) {
       update({ step: 'browser', status: 'skipped' });
-      warn(browserEnabled ? 'Playwright/Chromium is not installed on the worker – element-level image, video, coverage and listener diagnostics are unavailable. Run "npm run browsers".' : 'Browser inspection disabled (DISABLE_BROWSER=true).');
+      warn(
+        process.env.VERCEL
+          ? 'Lite scan (Vercel): browser inspection is not available here, so element-level image, video, CSS/JS coverage and event-listener diagnostics are limited to what Lighthouse reports. Run SpeedLab locally (npm run dev) or connect a worker for full scans.'
+          : browserEnabled
+            ? 'Playwright/Chromium is not installed on the worker – element-level image, video, coverage and listener diagnostics are unavailable. Run "npm run browsers".'
+            : 'Browser inspection disabled (DISABLE_BROWSER=true).',
+      );
       tick(20);
       return null;
     }

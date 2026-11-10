@@ -176,20 +176,45 @@ export function AppProvider({ children }) {
     async ({ url, strategy, projectId }) => {
       setScanError(null);
       try {
-        const { jobs: created } = await api('/jobs', { method: 'POST', body: { url, strategy, projectId: projectId || null } });
+        // Show placeholder progress while an inline (Vercel Lite) scan runs inside the request.
+        const pending = (strategy === 'both' ? ['mobile', 'desktop'] : [strategy]).map((s) => ({
+          id: `pending-${s}`,
+          status: 'running',
+          progress: 5,
+          strategy: s,
+          message: 'Analysing… PageSpeed Insights usually takes 20–60 seconds',
+          steps: [],
+          warnings: [],
+        }));
+        setJobs(pending);
+        startAbort.current = new AbortController();
+        const { jobs: created } = await api('/jobs', { method: 'POST', body: { url, strategy, projectId: projectId || null }, signal: startAbort.current.signal });
+        startAbort.current = null;
         setJobs(created);
         if (strategy !== 'both') setDevice(strategy);
-        ensurePolling();
+        for (const j of created) if (j.status === 'done' && j.report) putReport({ ...j.report, id: j.scanId || j.report.id });
+        if (created.some((j) => ['queued', 'running'].includes(j.status))) ensurePolling();
         return created;
       } catch (err) {
+        startAbort.current = null;
+        if (err.name === 'AbortError') {
+          setJobs((prev) => prev.map((j) => ({ ...j, status: 'cancelled', message: 'Scan cancelled' })));
+          return [];
+        }
+        setJobs([]);
         setScanError(err.message);
         throw err;
       }
     },
-    [ensurePolling],
+    [ensurePolling, putReport],
   );
 
+  const startAbort = useRef(null);
   const cancelScan = useCallback(async () => {
+    if (startAbort.current) {
+      startAbort.current.abort();
+      return;
+    }
     const active = jobsRef.current.filter((j) => ['queued', 'running'].includes(j.status));
     const results = await Promise.all(active.map((j) => api(`/jobs/${j.id}`, { method: 'DELETE' }).catch(() => ({ ...j, status: 'cancelled' }))));
     setJobs((prev) => prev.map((j) => results.find((r) => r.id === j.id) || j));
