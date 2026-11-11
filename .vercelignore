@@ -1,0 +1,14 @@
+# Never upload secrets or local artifacts when deploying with the Vercel CLI
+.env
+.env.*
+!.env.example
+node_modules
+**/node_modules
+dist
+data
+server/data
+worker/data
+.git
+.vercel
+supabase/.temp
+*.log
