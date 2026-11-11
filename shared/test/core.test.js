@@ -187,3 +187,22 @@ test('hosting detection, delay loader and WordPress plugin generator', async () 
   assert.doesNotMatch(main, /speedlab_delay_buffer/, 'unselected feature not included');
   assert.ok(p.warnings.some((w) => /WP Rocket/.test(w)));
 });
+
+test('broken link extraction and framework fixes', async () => {
+  const { extractLinks, checkLinks } = await import('../src/net/linkCheck.js');
+  const { buildFrameworkFixes } = await import('../src/codegen/jsFrameworks.js');
+  const html = '<a href="#top">t</a><a href="#missing">m</a><div id="here"></div><a href="#here">h</a><a href="mailto:x@y.z">mail</a><a href="/about">About us</a><a href="/about">again</a><img src="/logo.png" alt="Logo"><a href="http://10.0.0.5/admin">lan</a><a href="https://www.ex.com/cdn-cgi/l/email-protection#abc">e</a>';
+  const items = extractLinks(html, 'https://www.ex.com/');
+  const by = (u) => items.find((i) => i.url === u);
+  assert.equal(by('#missing').status, 'broken-anchor');
+  assert.equal(by('#here').ok, true);
+  assert.equal(by('https://www.ex.com/about').count, 2);
+  assert.equal(by('https://www.ex.com/about').text, 'About us');
+  assert.ok(!items.some((i) => i.url.startsWith('mailto')));
+  const r = await checkLinks(items.filter((i) => /10\.0\.0\.5|email-protection|#/.test(i.url)), { max: 5 });
+  assert.equal(r.results.find((x) => x.url.includes('10.0.0.5')).status, 'skipped', 'private address never contacted');
+  assert.equal(r.results.find((x) => x.url.includes('email-protection')).status, 'skipped');
+  const next = buildFrameworkFixes({ issues: [{ type: 'lcp-lazy', id: 'a', title: 'x', priority: 'high' }], lcp: { imageUrl: 'https://ex.com/h.jpg' } }, 'next');
+  assert.match(next[0].snippets[0].after, /next\/image/);
+  assert.match(next[0].snippets[0].after, /priority/);
+});

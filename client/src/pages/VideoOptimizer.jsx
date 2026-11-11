@@ -1,8 +1,10 @@
-import { Video, Youtube, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { Video, Youtube, CheckCircle2, Film } from 'lucide-react';
+import VideoCompressor from '../components/VideoCompressor.jsx';
 import { formatBytes, formatMs, shortUrl } from '@speedlab/shared/format';
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
-import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Notice, EmptyState } from '../components/ui.jsx';
+import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Notice, EmptyState, Tabs } from '../components/ui.jsx';
 
 const LABELS = {
   'missing-poster': 'No poster',
@@ -140,5 +142,18 @@ function VideosPage({ report }) {
 }
 
 export default function VideoOptimizer() {
-  return <RequireReport title="Video Optimizer">{(report) => <VideosPage report={report} />}</RequireReport>;
+  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'compress' ? 'compress' : 'scan'));
+  return (
+    <div className="space-y-5">
+      <Tabs tabs={[{ key: 'scan', label: 'Scan results' }, { key: 'compress', label: 'Compress video' }]} value={tab} onChange={setTab} />
+      {tab === 'compress' ? (
+        <>
+          <PageHeader icon={Film} title="Video Compressor" description="Compress MP4/MOV/WebM videos for the web, resize them, remove audio for background videos and get a poster image plus ready <video> markup – all inside your browser." />
+          <VideoCompressor />
+        </>
+      ) : (
+        <RequireReport title="Video Optimizer">{(report) => <VideosPage report={report} />}</RequireReport>
+      )}
+    </div>
+  );
 }

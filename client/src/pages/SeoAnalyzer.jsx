@@ -9,6 +9,7 @@ const PROGRESS_TONE = { Open: 'slate', 'In progress': 'blue', Done: 'green', "Wo
 import RequireReport from '../components/RequireReport.jsx';
 import ScoreGauge from '../components/ScoreGauge.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
+import BrokenLinks from '../components/BrokenLinks.jsx';
 import { Card, CardHeader, PageHeader, Tabs, Badge, Button, EmptyState, Notice, Stat, KeyValue, cx } from '../components/ui.jsx';
 
 const STATUS = {
@@ -252,6 +253,7 @@ function SeoPage({ report }) {
           { key: 'social', label: 'Social', count: groups.social.length },
           { key: 'sd', label: 'Structured data' },
           { key: 'tags', label: 'Analytics & GTM', count: groups.tags.length },
+          { key: 'links', label: 'Broken links' },
           { key: 'lighthouse', label: 'Lighthouse SEO', count: seo.lighthouse.length },
         ]}
         value={tab}
@@ -312,6 +314,7 @@ function SeoPage({ report }) {
           <Notice>Tags configured inside GTM are not visible in the page HTML. Use Google Tag Assistant to confirm which tags fire and in which order.</Notice>
         </div>
       )}
+      {tab === 'links' && <BrokenLinks report={report} />}
       {tab === 'lighthouse' && (
         <Card>
           <CardHeader title="Lighthouse SEO audits" subtitle={seo.lighthouseScore !== null ? `Lighthouse SEO score ${seo.lighthouseScore}` : 'Unavailable for this scan'} />

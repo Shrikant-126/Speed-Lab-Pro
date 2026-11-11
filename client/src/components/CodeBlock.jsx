@@ -3,7 +3,7 @@ import { Check, Copy, Download } from 'lucide-react';
 import { downloadText } from '../lib/api.js';
 import { cx } from './ui.jsx';
 
-const EXT = { html: 'html', css: 'css', javascript: 'js', liquid: 'liquid', php: 'php', nginx: 'conf', apache: 'htaccess', json: 'json', bash: 'sh', text: 'txt' };
+const EXT = { html: 'html', css: 'css', javascript: 'js', jsx: 'jsx', liquid: 'liquid', php: 'php', nginx: 'conf', apache: 'htaccess', json: 'json', bash: 'sh', text: 'txt' };
 
 export async function copyText(text) {
   try {

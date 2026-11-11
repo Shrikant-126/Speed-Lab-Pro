@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Code2, Download, Upload, FileArchive, ShoppingBag, Globe, CheckCircle2, AlertTriangle, MapPin, Trash2 } from 'lucide-react';
-import { generateFixes, contextFromReport } from '@speedlab/shared/codegen';
+import { generateFixes, contextFromReport, buildFrameworkFixes, JS_FRAMEWORKS, detectFramework } from '@speedlab/shared/codegen';
 import { formatBytes } from '@speedlab/shared/format';
 import { useApp } from '../context/AppContext.jsx';
 import { api, downloadBlob } from '../lib/api.js';
@@ -85,7 +85,8 @@ const SHOPIFY_PLACEMENT = {
 
 function PlatformOptimizer({ report }) {
   const detected = report?.platform || {};
-  const [platform, setPlatform] = useState(detected.name === 'wordpress' ? 'wordpress' : 'shopify');
+  const [platform, setPlatform] = useState(detected.name === 'wordpress' ? 'wordpress' : detected.name === 'shopify' ? 'shopify' : detected.name === 'other' ? 'javascript' : 'shopify');
+  const [framework, setFramework] = useState(() => detectFramework(report));
   const detectedTheme = SHOPIFY_THEMES.find((t) => (detected.knownTheme || detected.theme || '').toLowerCase().includes(t.toLowerCase()));
   const [theme, setTheme] = useState(detectedTheme || 'Dawn');
   const [builder, setBuilder] = useState(['Elementor', 'Divi', 'Bricks', 'Gutenberg'].includes(detected.builder) ? detected.builder : 'Elementor');
@@ -93,6 +94,7 @@ function PlatformOptimizer({ report }) {
 
   const groups = useMemo(() => {
     if (!report) return [];
+    if (platform === 'javascript') return buildFrameworkFixes(report, framework);
     const ctx = {
       ...contextFromReport(report),
       platform: { name: platform, label: platform === 'shopify' ? 'Shopify' : 'WordPress', theme, builder, cachePlugin: cachePlugin === 'None' ? null : cachePlugin },
@@ -100,7 +102,7 @@ function PlatformOptimizer({ report }) {
     return (report.issues || [])
       .map((issue) => ({ issue, snippets: generateFixes(issue, ctx).filter((s) => s.target === platform) }))
       .filter((g) => g.snippets.length);
-  }, [report, platform, theme, builder, cachePlugin]);
+  }, [report, platform, theme, builder, cachePlugin, framework]);
 
   return (
     <div className="space-y-5">
@@ -109,9 +111,14 @@ function PlatformOptimizer({ report }) {
         <div className="flex flex-wrap items-end gap-3 p-5">
           <div>
             <label className="label">Platform</label>
-            <Tabs tabs={[{ key: 'shopify', label: 'Shopify' }, { key: 'wordpress', label: 'WordPress' }]} value={platform} onChange={setPlatform} />
+            <Tabs tabs={[{ key: 'shopify', label: 'Shopify' }, { key: 'wordpress', label: 'WordPress' }, { key: 'javascript', label: 'JavaScript' }]} value={platform} onChange={setPlatform} />
           </div>
-          {platform === 'shopify' ? (
+          {platform === 'javascript' ? (
+            <div>
+              <label className="label">Framework</label>
+              <Select value={framework} onChange={setFramework} options={JS_FRAMEWORKS.map((f) => ({ value: f.key, label: f.label }))} />
+            </div>
+          ) : platform === 'shopify' ? (
             <div>
               <label className="label">Theme</label>
               <Select value={theme} onChange={setTheme} options={SHOPIFY_THEMES.map((t) => ({ value: t, label: t }))} />
@@ -138,6 +145,11 @@ function PlatformOptimizer({ report }) {
             <p className="mt-2 text-xs text-slate-500">File names vary between theme versions; search your theme code for the markup shown in the “before” snippets. Always edit a duplicate theme first.</p>
           </div>
         )}
+        {platform === 'javascript' && (
+          <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+            Framework-specific fixes for the issues in this scan ({JS_FRAMEWORKS.find((f) => f.key === framework).label}). Each snippet shows the file to edit; React examples work with Vite or CRA, Next.js examples use the App Router.
+          </div>
+        )}
         {platform === 'wordpress' && (
           <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
             Put PHP snippets in a child theme&apos;s <code>functions.php</code> or a code-snippets plugin, never in the parent theme. Settings notes below are tailored to {builder}{cachePlugin !== 'None' ? ` + ${cachePlugin}` : ''}.
@@ -147,7 +159,7 @@ function PlatformOptimizer({ report }) {
       {!report ? (
         <EmptyState title="Run a scan first" description="Platform-specific code is generated from the issues found on your site." action={<Link to="/analyzer"><Button>Analyze a website</Button></Link>} />
       ) : !groups.length ? (
-        <EmptyState title={`No ${platform === 'shopify' ? 'Shopify' : 'WordPress'} snippets for this scan`} description="None of the detected issues have platform-specific fixes." />
+        <EmptyState title={`No ${platform === 'shopify' ? 'Shopify' : platform === 'javascript' ? 'JavaScript' : 'WordPress'} snippets for this scan`} description="None of the detected issues have platform-specific fixes." />
       ) : (
         <div className="space-y-3">
           {groups.map(({ issue, snippets }) => (

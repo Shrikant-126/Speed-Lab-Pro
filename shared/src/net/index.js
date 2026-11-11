@@ -9,3 +9,4 @@ export {
 export { safeFetch, readLimited, safeAgent, DEFAULT_UA } from './safeFetch.js';
 export { probeDocument, measureConnection, probeSeoFiles } from './probe.js';
 export { runPageSpeed, fetchCrux, PageSpeedError } from './google.js';
+export { extractLinks, checkLinks } from './linkCheck.js';

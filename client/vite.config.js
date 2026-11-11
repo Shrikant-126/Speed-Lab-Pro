@@ -9,6 +9,9 @@ const outDir = fileURLToPath(new URL('../dist', import.meta.url));
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   envDir: '..',
+  // ffmpeg.wasm spawns its own worker via new URL(..., import.meta.url) – it must not be pre-bundled.
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
+  worker: { format: 'es' },
   server: {
     port: 5173,
     proxy: {

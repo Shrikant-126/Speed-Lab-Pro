@@ -9,6 +9,7 @@ import scans from './routes/scans.js';
 import data from './routes/data.js';
 import uploads from './routes/uploads.js';
 import images from './routes/images.js';
+import seo from './routes/seo.js';
 import { workerHealth, workerMode } from './workerClient.js';
 import { getStore } from '@speedlab/shared/store';
 
@@ -55,6 +56,7 @@ export function createApp() {
   app.use('/api', data);
   app.use('/api', uploads);
   app.use('/api', images);
+  app.use('/api', seo);
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
