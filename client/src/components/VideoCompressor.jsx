@@ -1,5 +1,6 @@
 // In-browser video compressor (ffmpeg.wasm). Files never leave the user's computer, so there
-// is no upload size limit from the server – only the browser's memory (~1–2 GB).
+// is no upload or size limit. The file is mounted read-only (WORKERFS) instead of being copied into
+// wasm memory, so even multi-GB videos can be read – only the device's speed/RAM is the limit.
 import { useEffect, useRef, useState } from 'react';
 import { Film, Upload, Wand2, Download, XCircle, Image as ImageIcon, Trash2, Info } from 'lucide-react';
 import { formatBytes } from '@speedlab/shared/format';
@@ -8,7 +9,7 @@ import CodeBlock from './CodeBlock.jsx';
 import { downloadBlob } from '../lib/api.js';
 
 const CORE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
-const MAX_BYTES = 1024 * 1024 * 1024;
+const BIG_BYTES = 2 * 1024 * 1024 * 1024;
 const RES = [
   { v: '', label: 'Keep original size' },
   { v: '1920', label: '1080p (1920 px)' },
@@ -99,10 +100,6 @@ export default function VideoCompressor() {
       setError('Choose a video file (MP4, MOV, WebM, MKV, AVI).');
       return;
     }
-    if (f.size > MAX_BYTES) {
-      setError('This file is larger than 1 GB – too big to process in the browser. Trim it or use desktop ffmpeg (command below).');
-      return;
-    }
     setFile(f);
     setCrf(format === 'webm' ? 36 : 28);
   };
@@ -119,13 +116,14 @@ export default function VideoCompressor() {
       setState('loading');
       const ff = await getFFmpeg(setMsg);
       ffRef.current = ff;
-      const { fetchFile } = await import('@ffmpeg/util');
       ff.on('progress', ({ progress: p }) => setProgress(Math.max(0, Math.min(1, p))));
-      const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
-      const input = `input.${ext}`;
+      // Mount the File itself (no copy into memory) – this is what removes the size limit.
+      await ff.createDir('/in').catch(() => {});
+      await ff.unmount('/in').catch(() => {});
+      await ff.mount('WORKERFS', { files: [file] }, '/in');
+      const input = `/in/${file.name}`;
       const output = format === 'webm' ? 'output.webm' : 'output.mp4';
       setMsg('Reading video…');
-      await ff.writeFile(input, await fetchFile(file));
       setState('encoding');
       setMsg(format === 'webm' ? 'Encoding VP9 WebM (slow in the browser)…' : 'Encoding H.264 MP4…');
       const vf = width ? ['-vf', `scale='min(${width},iw)':-2`] : [];
@@ -137,7 +135,7 @@ export default function VideoCompressor() {
       const code = await ff.exec(['-i', input, ...vf, ...rate, ...video, ...audio, output]);
       if (code !== 0) throw new Error('The video could not be encoded (unsupported codec or corrupted file).');
       const data = await ff.readFile(output);
-      await ff.deleteFile(input).catch(() => {});
+      await ff.unmount('/in').catch(() => {});
       await ff.deleteFile(output).catch(() => {});
       const blob = new Blob([data.buffer], { type: format === 'webm' ? 'video/webm' : 'video/mp4' });
       setMsg('Creating poster image…');
@@ -197,7 +195,7 @@ export default function VideoCompressor() {
           >
             <Upload size={28} className="mb-2 text-brand-500" />
             <p className="font-medium text-slate-800 dark:text-slate-100">Drop a video here or click to choose</p>
-            <p className="mt-1 text-xs text-slate-500">MP4, MOV, WebM, MKV · up to 1 GB · images go to Image Optimizer → Convert & optimize</p>
+            <p className="mt-1 text-xs text-slate-500">MP4, MOV, WebM, MKV · any size (processed on your device, nothing uploaded) · images go to Image Optimizer → Convert & optimize</p>
             <input ref={inputRef} type="file" accept="video/*,.mkv,.mov" className="hidden" onChange={(e) => { pick(e.target.files[0]); e.target.value = ''; }} />
           </div>
 
@@ -209,6 +207,9 @@ export default function VideoCompressor() {
                 {!busy && <button type="button" onClick={() => { setFile(null); setResult(null); }} className="text-slate-400 hover:text-red-500" aria-label="Remove video"><Trash2 size={16} /></button>}
               </span>
             </div>
+          )}
+          {file && file.size > BIG_BYTES && (
+            <Notice tone="warn">This is a very large video ({formatBytes(file.size)}). It will work, but browser encoding is single-threaded and can take a long time – keep this tab open. Lower resolution / "ultrafast" preset speeds it up.</Notice>
           )}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

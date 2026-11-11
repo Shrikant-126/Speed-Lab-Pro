@@ -1,13 +1,14 @@
-// Upload JPG/PNG/WebP/GIF/TIFF images (or convert an image from the scan) to
-// WebP / AVIF / optimised JPEG / PNG with Sharp, optionally at responsive widths.
-// Each image is converted in its own request (3 in parallel), so large batches stay
-// within serverless body limits and every row shows its own progress.
+// Convert JPG/PNG/WebP/AVIF/GIF/BMP images (or an image from the scan) to WebP / AVIF /
+// optimised JPEG / PNG, optionally at responsive widths.
+// Images are converted IN THE BROWSER (Web Workers + WASM codecs from Squoosh): nothing is
+// uploaded, so there is no file-size or file-count limit beyond the device's memory.
+// Formats the browser cannot decode (e.g. TIFF in Chrome) fall back to the server (Sharp).
 
 import { useEffect, useRef, useState } from 'react';
 import { Upload, Wand2, Download, FileArchive, CheckCircle2, Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
 import { formatBytes } from '@speedlab/shared/format';
 import { api, downloadBlob } from '../lib/api.js';
-import { Card, CardHeader, Button, Badge, ErrorState, Notice, cx } from './ui.jsx';
+import { Card, CardHeader, Button, Badge, Notice, cx } from './ui.jsx';
 import CodeBlock from './CodeBlock.jsx';
 
 const FORMATS = [
@@ -15,7 +16,7 @@ const FORMATS = [
   { key: 'avif', label: 'AVIF', hint: 'Smallest files, slower to encode' },
   { key: 'original', label: 'Optimized original', hint: 'Same format (JPEG/PNG), recompressed' },
   { key: 'jpeg', label: 'JPEG', hint: 'Convert to progressive mozjpeg' },
-  { key: 'png', label: 'PNG', hint: 'Palette-quantised PNG' },
+  { key: 'png', label: 'PNG', hint: 'Lossless PNG (OxiPNG optimised)' },
 ];
 const PRESETS = [
   { label: 'Keep original size', value: '' },
@@ -24,9 +25,49 @@ const PRESETS = [
   { label: 'Product: 360, 540, 720, 1080', value: '360,540,720,1080' },
   { label: 'Thumbnail: 150, 300', value: '150,300' },
 ];
-const MAX_FILES = 50;
-const CONCURRENCY = 3;
 let uid = 0;
+let msgId = 0;
+let pool = null;
+
+/** A small pool of image workers (one per spare CPU core, max 4). */
+function getPool() {
+  if (!pool) {
+    const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
+    pool = Array.from({ length: n }, () => new Worker(new URL('../workers/imageWorker.js', import.meta.url), { type: 'module' }));
+  }
+  return pool;
+}
+
+function runInWorker(worker, buffer, name, options, onProgress) {
+  return new Promise((resolve, reject) => {
+    const id = ++msgId;
+    const onMsg = (e) => {
+      if (e.data?.id !== id) return;
+      if (e.data.progress) return onProgress?.(e.data.progress);
+      worker.removeEventListener('message', onMsg);
+      worker.removeEventListener('error', onErr);
+      return e.data.ok ? resolve(e.data.result) : reject(new Error(e.data.error));
+    };
+    const onErr = (e) => {
+      worker.removeEventListener('message', onMsg);
+      worker.removeEventListener('error', onErr);
+      reject(new Error(e.message || 'Image worker crashed (the image may be too large for this device memory)'));
+    };
+    worker.addEventListener('message', onMsg);
+    worker.addEventListener('error', onErr);
+    worker.postMessage({ id, buffer, name, options }, [buffer]);
+  });
+}
+
+const withUrls = (result) => ({
+  ...result,
+  outputs: result.outputs.map((o) => {
+    const blob = o.blob || (o.buffer ? new Blob([o.buffer], { type: o.mime }) : b64ToBlob(o.data, o.mime));
+    return { ...o, buffer: undefined, data: undefined, blob, url: URL.createObjectURL(blob) };
+  }),
+});
+const revokeResult = (r) => r?.outputs?.forEach((o) => o.url && URL.revokeObjectURL(o.url));
+const parseWidths = (w) => [...new Set(String(w || '').split(',').map((x) => parseInt(x, 10)).filter((x) => x >= 16 && x <= 20000))].slice(0, 8);
 
 function b64ToBlob(b64, mime) {
   const bin = atob(b64);
@@ -71,39 +112,35 @@ function readDims(url) {
 const pct = (a, b) => (a ? Math.round((1 - b / a) * 100) : 0);
 
 export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
-  // item: { id, file?, name, size, url, dims, state: ready|queued|converting|done|error, result, error }
+  // item: { id, file?, name, size, url, dims, state: ready|queued|converting|done|error, result, error, progress }
   const [items, setItems] = useState([]);
   const [formats, setFormats] = useState(['webp', 'avif', 'original']);
-  const [quality, setQuality] = useState({ webp: 78, avif: 50, jpeg: 80, png: 85 });
+  const [quality, setQuality] = useState({ webp: 78, avif: 50, jpeg: 80 });
   const [widths, setWidths] = useState('');
-  const [keepMetadata, setKeepMetadata] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [status, setStatus] = useState(null);
   const [drag, setDrag] = useState(false);
   const [openId, setOpenId] = useState(null);
   const inputRef = useRef(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
-  useEffect(() => {
-    api('/images/status').then(setStatus).catch(() => setStatus(null));
-  }, []);
-  useEffect(() => () => itemsRef.current.forEach((i) => i.file && URL.revokeObjectURL(i.url)), []);
+  useEffect(() => () => itemsRef.current.forEach((i) => { if (i.file) URL.revokeObjectURL(i.url); revokeResult(i.result); }), []);
 
-  const options = () => ({ formats, quality, widths, keepMetadata });
+  const options = () => ({ formats, quality: { ...quality, png: 100 }, widths: parseWidths(widths) });
   const patch = (id, p) => setItems((list) => list.map((x) => (x.id === id ? { ...x, ...p } : x)));
 
-  // Convert an image straight from the scan (no upload needed).
+  // Convert an image straight from the scan (fetched by the server, no upload needed).
   useEffect(() => {
     if (!initialUrl) return;
     const id = ++uid;
     const name = decodeURIComponent(initialUrl.split('?')[0].split('/').pop() || 'image');
     setItems((l) => [...l, { id, name, size: null, url: initialUrl, dims: null, state: 'converting' }]);
-    api('/images/convert-url', { method: 'POST', body: { url: initialUrl, options: options() } })
+    const o = options();
+    api('/images/convert-url', { method: 'POST', body: { url: initialUrl, options: { ...o, widths: o.widths.join(',') } } })
       .then(({ results }) => {
         const r = results[0];
-        patch(id, { state: r?.error ? 'error' : 'done', result: r?.error ? null : r, error: r?.error, size: r?.input?.bytes, dims: r?.input?.width ? { width: r.input.width, height: r.input.height } : null });
+        patch(id, { state: r?.error ? 'error' : 'done', result: r?.error ? null : withUrls(r), error: r?.error, size: r?.input?.bytes, dims: r?.input?.width ? { width: r.input.width, height: r.input.height } : null });
       })
       .catch((e) => patch(id, { state: 'error', error: e.message }));
     onConsumedUrl?.();
@@ -113,38 +150,47 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
   const addFiles = (list) => {
     setError(null);
     const all = [...list];
-    const accepted = all.filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|avif|gif|tiff?)$/i.test(f.name));
-    const notes = [];
-    if (accepted.length < all.length) notes.push('Some files were skipped – only JPG, PNG, WebP, AVIF, GIF and TIFF images are supported.');
-    const room = MAX_FILES - itemsRef.current.length;
-    if (accepted.length > room) notes.push(`Up to ${MAX_FILES} images at a time – ${accepted.length - Math.max(0, room)} were not added.`);
-    if (notes.length) setError(notes.join(' '));
-    const maxBytes = status?.limits?.maxFileBytes;
-    const fresh = accepted.slice(0, Math.max(0, room)).map((file) => {
-      const url = URL.createObjectURL(file);
-      const tooBig = maxBytes && file.size > maxBytes;
-      return { id: ++uid, file, name: file.name, size: file.size, url, dims: null, state: tooBig ? 'error' : 'ready', error: tooBig ? `Larger than ${formatBytes(maxBytes)} – resize it first` : null, tooBig };
-    });
+    const accepted = all.filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?|heic|heif)$/i.test(f.name));
+    if (accepted.length < all.length) setError('Some files were skipped – only image files (JPG, PNG, WebP, AVIF, GIF, BMP, TIFF) are supported.');
+    const fresh = accepted.map((file) => ({ id: ++uid, file, name: file.name, size: file.size, url: URL.createObjectURL(file), dims: null, state: 'ready', error: null }));
     setItems((l) => [...l, ...fresh]);
     fresh.forEach((it) => readDims(it.url).then((d) => d && patch(it.id, { dims: d })));
   };
 
   const remove = (it) => {
     if (it.file) URL.revokeObjectURL(it.url);
+    revokeResult(it.result);
     setItems((l) => l.filter((x) => x.id !== it.id));
   };
 
-  const convertOne = async (it, opts) => {
-    patch(it.id, { state: 'converting', error: null });
+  // Server (Sharp) fallback – only for formats this browser cannot decode (e.g. TIFF/HEIC in Chrome).
+  const convertOnServer = async (it, opts) => {
+    const form = new FormData();
+    form.append('files', it.file, it.name);
+    form.append('options', JSON.stringify({ ...opts, widths: opts.widths.join(','), keepMetadata: false }));
+    const { results } = await api('/images/convert', { method: 'POST', form });
+    const r = results[0];
+    if (r?.error) throw new Error(r.error);
+    return withUrls(r);
+  };
+
+  const convertOne = async (it, opts, worker) => {
+    patch(it.id, { state: 'converting', error: null, progress: 'Reading file…' });
     try {
-      const form = new FormData();
-      form.append('files', it.file, it.name);
-      form.append('options', JSON.stringify(opts));
-      const { results } = await api('/images/convert', { method: 'POST', form });
-      const r = results[0];
-      patch(it.id, r?.error ? { state: 'error', error: r.error, result: null } : { state: 'done', result: r });
+      let result;
+      try {
+        const raw = await runInWorker(worker, await it.file.arrayBuffer(), it.name, opts, (p) => patch(it.id, { progress: p }));
+        result = withUrls(raw);
+      } catch (e) {
+        if (!/cannot be decoded in this browser/i.test(e.message)) throw e;
+        patch(it.id, { progress: 'Converting on the server…' });
+        result = await convertOnServer(it, opts).catch((err) => {
+          throw new Error(/sign in|unauthori/i.test(err.message) ? `${e.message} – sign in to convert it on the server, or save it as PNG/JPG first` : err.message);
+        });
+      }
+      patch(it.id, { state: 'done', result, progress: null });
     } catch (e) {
-      patch(it.id, { state: 'error', error: e.message });
+      patch(it.id, { state: 'error', error: e.message, progress: null });
     }
   };
 
@@ -158,27 +204,34 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
     setError(null);
     const opts = options();
     const ids = new Set(todo.map((t) => t.id));
+    todo.forEach((t) => revokeResult(t.result));
     setItems((l) => l.map((x) => (ids.has(x.id) ? { ...x, state: 'queued', result: null, error: null } : x)));
     const queue = [...todo];
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      while (queue.length) await convertOne(queue.shift(), opts);
+    const workers = getPool();
+    await Promise.all(workers.slice(0, Math.min(workers.length, queue.length)).map(async (w) => {
+      while (queue.length) await convertOne(queue.shift(), opts, w);
     }));
     setBusy(false);
   };
-  const convertPending = () => runQueue(itemsRef.current.filter((x) => x.file && !x.tooBig && x.state !== 'done'));
-  const convertAgain = () => runQueue(itemsRef.current.filter((x) => x.file && !x.tooBig));
+  const convertPending = () => runQueue(itemsRef.current.filter((x) => x.file && x.state !== 'done'));
+  const convertAgain = () => runQueue(itemsRef.current.filter((x) => x.file));
 
-  const downloadOne = (o) => downloadBlob(b64ToBlob(o.data, o.mime), o.filename);
+  const downloadOne = (o) => downloadBlob(o.blob, o.filename);
   const done = items.filter((i) => i.state === 'done' && i.result);
   const downloadAll = async () => {
     const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
-    for (const it of done) for (const o of it.result.outputs) zip.file(o.filename, o.data, { base64: true });
+    for (const it of done) for (const o of it.result.outputs) zip.file(o.filename, o.blob);
     const md = done
       .map(({ result: r }) => `## ${r.input.name}\nOriginal: ${r.input.format?.toUpperCase()} ${r.input.width}×${r.input.height}, ${formatBytes(r.input.bytes)}\n\n${r.outputs.map((o) => `- ${o.filename}: ${o.width}×${o.height}, ${formatBytes(o.bytes)} (${o.savedPercent > 0 ? '-' : '+'}${Math.abs(o.savedPercent)}%)`).join('\n')}\n\n\`\`\`html\n${pictureCode(r)}\n\`\`\``)
       .join('\n\n');
     zip.file('README.md', `# SpeedLab Pro – optimized images\n\n${md}\n`);
-    downloadBlob(await zip.generateAsync({ type: 'blob' }), 'speedlab-optimized-images.zip');
+    downloadBlob(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), 'speedlab-optimized-images.zip');
+  };
+
+  const clearAll = () => {
+    itemsRef.current.forEach((i) => { if (i.file) URL.revokeObjectURL(i.url); revokeResult(i.result); });
+    setItems([]);
   };
 
   const toggleFormat = (k) => setFormats((f) => (f.includes(k) ? f.filter((x) => x !== k) : [...f, k]));
@@ -186,14 +239,13 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
   const doneIn = done.reduce((s, i) => s + (i.result.input?.bytes || i.size || 0), 0);
   // Never count a "bigger than the original" variant – the user would keep the original.
   const doneOut = done.reduce((s, i) => s + Math.min(bestOutput(i.result)?.bytes ?? Infinity, i.result.input?.bytes || i.size || Infinity), 0);
-  const pending = items.filter((i) => i.file && !i.tooBig && ['ready', 'queued', 'converting', 'error'].includes(i.state)).length;
+  const pending = items.filter((i) => i.file && ['ready', 'queued', 'converting', 'error'].includes(i.state)).length;
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader icon={Wand2} title="Convert & optimize images" subtitle="JPG, PNG, WebP, AVIF, GIF or TIFF → WebP, AVIF or optimized JPEG/PNG. Processed on the server with Sharp; nothing is stored." />
+        <CardHeader icon={Wand2} title="Convert & optimize images" subtitle="JPG, PNG, WebP, AVIF, GIF or TIFF → WebP, AVIF or optimized JPEG/PNG. Converted in your browser – no upload, no file-size or file-count limit." />
         <div className="space-y-5 p-5">
-          {status && !status.sharp && <ErrorState title="Sharp is not available on the server" message="Install it with: npm install sharp" />}
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -210,8 +262,8 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
           >
             <Upload size={26} className="mb-2 text-brand-500" />
             <p className="font-medium text-slate-800 dark:text-slate-100">Drop images here or click to choose</p>
-            <p className="mt-1 text-xs text-slate-500">Up to {MAX_FILES} images, {formatBytes(status?.limits?.maxFileBytes || 15728640)} each</p>
-            <input ref={inputRef} type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/tiff" className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <p className="mt-1 text-xs text-slate-500">Any number of images, any size – processed on your device (very large images need more RAM)</p>
+            <input ref={inputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           </div>
 
           <div>
@@ -226,8 +278,8 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[['webp', 'WebP quality'], ['avif', 'AVIF quality'], ['jpeg', 'JPEG quality'], ['png', 'PNG quality']].map(([k, l]) => (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[['webp', 'WebP quality'], ['avif', 'AVIF quality'], ['jpeg', 'JPEG quality']].map(([k, l]) => (
               <div key={k}>
                 <span className="label">{l}: {quality[k]}</span>
                 <input type="range" min="1" max="100" value={quality[k]} onChange={(e) => setQuality((q) => ({ ...q, [k]: Number(e.target.value) }))} className="w-full accent-brand-500" />
@@ -249,10 +301,7 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
               <p className="mt-1 text-xs text-slate-500">Images are never upscaled; widths larger than the original are capped.</p>
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={keepMetadata} onChange={(e) => setKeepMetadata(e.target.checked)} />
-            Keep EXIF/ICC metadata (off = stripped, smaller files and no location data)
-          </label>
+          <p className="text-xs text-slate-500">PNG output is lossless. EXIF/GPS metadata is always stripped (smaller files, no location data); photos are auto-rotated first.</p>
           {error && <Notice tone="warn">{error}</Notice>}
         </div>
       </Card>
@@ -265,7 +314,7 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
               const inBytes = it.result?.input?.bytes ?? it.size;
               const saved = best && inBytes ? pct(inBytes, best.bytes) : null;
               const dims = best ? `${best.width}×${best.height}` : it.dims ? `${it.dims.width}×${it.dims.height}` : null;
-              const preview = best ? `data:${best.mime};base64,${best.data}` : it.url;
+              const preview = best ? best.url : it.url;
               return (
                 <li key={it.id}>
                   <div className="flex flex-wrap items-center gap-4 px-5 py-4">
@@ -295,7 +344,7 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
                             {inBytes ? formatBytes(inBytes) : ''}
                             {dims ? ` · ${dims}` : ''}
                             <span className="ml-2 inline-flex items-center gap-1 text-xs">
-                              {it.state === 'converting' ? <><Loader2 size={12} className="animate-spin text-brand-500" /> Converting…</> : it.state === 'queued' ? 'Waiting…' : 'Ready'}
+                              {it.state === 'converting' ? <><Loader2 size={12} className="animate-spin text-brand-500" /> {it.progress || 'Converting…'}</> : it.state === 'queued' ? 'Waiting…' : 'Ready'}
                             </span>
                           </>
                         )}
@@ -320,7 +369,7 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
                             {it.result.outputs.map((o) => (
                               <tr key={o.filename}>
                                 <td className="font-medium">{o.filename} {o === best && <Badge tone="green">smallest</Badge>}</td>
-                                <td className="uppercase">{o.format} <span className="text-xs text-slate-400">q{o.quality}</span></td>
+                                <td className="uppercase">{o.format} <span className="text-xs text-slate-400">{o.quality === 'lossless' ? 'lossless' : `q${o.quality}`}</span></td>
                                 <td className="tabular-nums">{o.width}×{o.height}</td>
                                 <td className="tabular-nums">{formatBytes(o.bytes)}</td>
                                 <td className={cx('tabular-nums font-medium', o.savedPercent > 0 ? 'text-emerald-600' : 'text-red-500')}>{o.savedPercent > 0 ? '−' : '+'}{Math.abs(o.savedPercent)}%</td>
@@ -352,9 +401,9 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
               )}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" disabled={busy} onClick={() => { items.forEach((i) => i.file && URL.revokeObjectURL(i.url)); setItems([]); }}>Clear all</Button>
+              <Button variant="secondary" disabled={busy} onClick={clearAll}>Clear all</Button>
               {pending > 0 || busy ? (
-                <Button icon={Wand2} loading={busy} onClick={convertPending} disabled={busy || (status && !status.sharp)}>
+                <Button icon={Wand2} loading={busy} onClick={convertPending} disabled={busy}>
                   {busy ? 'Converting…' : `Convert & optimize (${pending})`}
                 </Button>
               ) : (

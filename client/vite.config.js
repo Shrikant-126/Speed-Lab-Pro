@@ -9,8 +9,8 @@ const outDir = fileURLToPath(new URL('../dist', import.meta.url));
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   envDir: '..',
-  // ffmpeg.wasm spawns its own worker via new URL(..., import.meta.url) – it must not be pre-bundled.
-  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
+  // ffmpeg.wasm and the @jsquash codecs load their own worker/wasm files via new URL(..., import.meta.url) – it must not be pre-bundled.
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', '@jsquash/webp', '@jsquash/avif', '@jsquash/jpeg', '@jsquash/png', '@jsquash/oxipng', '@jsquash/resize'] },
   worker: { format: 'es' },
   server: {
     port: 5173,
