@@ -235,6 +235,7 @@ function collectInPage() {
       tag,
       selector: el ? sel(el) : null,
       snippet: el ? openTag(el) : null,
+      text: el && !S.lcp.url ? (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400) : null,
       isBackground: !!S.lcp.url && tag !== 'img' && tag !== 'video' && tag !== 'image',
       rect: r,
       rendered: r ? { w: r.w, h: r.h } : null,

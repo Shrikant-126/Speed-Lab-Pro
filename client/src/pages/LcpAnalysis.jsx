@@ -5,6 +5,7 @@ import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
 import MetricCard from '../components/MetricCard.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
+import LcpPreview from '../components/LcpPreview.jsx';
 import { Card, CardHeader, PageHeader, KeyValue, Badge, EmptyState, Notice, SourceTag } from '../components/ui.jsx';
 
 const PHASE_COLORS = { ttfb: '#c2ee2a', loadDelay: '#f59e0b', loadDuration: '#0ea5e9', renderDelay: '#ef4444' };
@@ -88,6 +89,8 @@ function LcpPage({ report }) {
       </div>
 
       {!hasData && <EmptyState icon={Target} title="LCP details unavailable" description="Lighthouse and the browser inspection did not return an LCP element for this scan." />}
+
+      <LcpPreview lcp={lcp} />
 
       {lcp.element && (
         <Card>

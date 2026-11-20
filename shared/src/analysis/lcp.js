@@ -21,6 +21,21 @@ const PHASE_EXPLAIN = {
     'The resource was ready but the element was not painted. Typical causes: render-blocking CSS/JS, web fonts blocking text, client-side rendering, or main-thread long tasks.',
 };
 
+/**
+ * The page as Lighthouse rendered it, used to show where the LCP element is.
+ * Uses the viewport "final-screenshot" (small JPEG); rect coordinates are CSS px of that viewport.
+ */
+function screenshotOf(lhr) {
+  const data = lhr?.audits?.['final-screenshot']?.details?.data;
+  if (typeof data !== 'string' || !data.startsWith('data:image/') || data.length > 400_000) return null;
+  const emu = lhr?.configSettings?.screenEmulation || {};
+  const viewportWidth = emu.width || (lhr?.configSettings?.formFactor === 'desktop' ? 1350 : 412);
+  const viewportHeight = emu.height || (lhr?.configSettings?.formFactor === 'desktop' ? 940 : 823);
+  return { data, viewportWidth, viewportHeight };
+}
+
+const cleanText = (t) => (typeof t === 'string' ? t.replace(/\s+/g, ' ').trim().slice(0, 400) || null : null);
+
 function phasesFromLighthouse(lhr) {
   const a = audit(lhr, 'lcp-breakdown-insight', 'lcp-phases-insight', 'largest-contentful-paint-element');
   if (!a) return null;
@@ -310,10 +325,13 @@ export function analyzeLcp({ lhr, inspection, requests, probe, finalUrl, imagePr
           selector: node?.selector || insp?.selector || null,
           snippet,
           nodeLabel: node?.nodeLabel || null,
+          // Prefer Lighthouse's label: it comes from the same run as the screenshot.
+          text: (type === 'text' ? cleanText(node?.nodeLabel) : null) || cleanText(insp?.text),
           tag,
           boundingRect: node?.boundingRect || insp?.rect || null,
         }
       : null,
+    screenshot: node?.boundingRect ? screenshotOf(lhr) : null,
     type,
     imageUrl,
     image,
