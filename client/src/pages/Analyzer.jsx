@@ -129,6 +129,7 @@ export default function Analyzer() {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
   const autoRan = useRef(null);
+  const formRef = useRef(null);
   // Scan requested while signed out – runs automatically right after sign-in.
   const [pendingRun, setPendingRun] = useState(null);
   const needsSignIn = supabaseEnabled && authReady && !user;
@@ -157,7 +158,11 @@ export default function Analyzer() {
     if (user && pendingRun) {
       const p = pendingRun;
       setPendingRun(null);
-      run(p.value, p.strat, p.baselineId);
+      if (p.fromForm) {
+        // Re-submit the form so the URL is validated; with no URL just focus the field.
+        if (p.value) formRef.current?.requestSubmit();
+        else document.getElementById('url')?.focus();
+      } else run(p.value, p.strat, p.baselineId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, pendingRun]);
@@ -193,6 +198,8 @@ export default function Analyzer() {
     e.preventDefault();
     setLocalError(null);
     const value = url.trim();
+    // Signed out: ask to sign in first (even before the URL is typed).
+    if (needsSignIn) return setPendingRun({ value: value || null, strat: strategy, fromForm: true });
     if (!value) return setLocalError('Enter a website URL');
     try {
       const u = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
@@ -223,7 +230,7 @@ export default function Analyzer() {
             Get real Core Web Vitals, an exact LCP breakdown, and prioritised fixes with ready-to-paste HTML, CSS, JavaScript, Shopify Liquid and WordPress code.
           </p>
         </div>
-        <form onSubmit={submit} className="relative mt-7 max-w-4xl space-y-4">
+        <form ref={formRef} onSubmit={submit} className="relative mt-7 max-w-4xl space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="flex flex-1 flex-col gap-2 rounded-2xl bg-white p-2 shadow-2xl shadow-black/20 md:flex-row dark:bg-slate-900">
               <div className="flex flex-1 items-center gap-2 px-3">
