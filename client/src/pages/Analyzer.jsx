@@ -6,6 +6,7 @@ import { api } from '../lib/api.js';
 import { Card, CardHeader, Button, ProgressBar, ErrorState, Notice, Badge, IconChip, cx } from '../components/ui.jsx';
 import ScoreGauge from '../components/ScoreGauge.jsx';
 import ScanMeter from '../components/ScanMeter.jsx';
+import SignInModal from '../components/SignInModal.jsx';
 import { formatMetric } from '@speedlab/shared/format';
 import { rateMetric } from '@speedlab/shared/thresholds';
 
@@ -119,7 +120,7 @@ function ResultSummary({ report, baselineId, onRetest, scanning }) {
 }
 
 export default function Analyzer() {
-  const { startScan, cancelScan, resetScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines } = useApp();
+  const { startScan, cancelScan, resetScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines, supabaseEnabled, authReady, user } = useApp();
   const [params, setParams] = useSearchParams();
   const [url, setUrl] = useState(() => params.get('url') || '');
   const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'mobile'));
@@ -128,6 +129,9 @@ export default function Analyzer() {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
   const autoRan = useRef(null);
+  // Scan requested while signed out – runs automatically right after sign-in.
+  const [pendingRun, setPendingRun] = useState(null);
+  const needsSignIn = supabaseEnabled && authReady && !user;
 
   useEffect(() => {
     api('/projects').then(setProjects).catch(() => setProjects([]));
@@ -135,6 +139,10 @@ export default function Analyzer() {
 
   const run = async (value, strat, baselineId) => {
     setLocalError(null);
+    if (needsSignIn) {
+      setPendingRun({ value, strat, baselineId });
+      return;
+    }
     setSubmitting(true);
     try {
       await startScan({ url: value, strategy: strat, projectId, baselineId });
@@ -145,16 +153,25 @@ export default function Analyzer() {
     }
   };
 
+  useEffect(() => {
+    if (user && pendingRun) {
+      const p = pendingRun;
+      setPendingRun(null);
+      run(p.value, p.strat, p.baselineId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pendingRun]);
+
   // /analyzer?url=…&strategy=…&run=1 starts a retest automatically (used by Retest buttons).
   useEffect(() => {
     const key = params.toString();
-    if (params.get('run') !== '1' || !params.get('url') || autoRan.current === key || scanning) return;
+    if (params.get('run') !== '1' || !params.get('url') || autoRan.current === key || scanning || !authReady) return;
     autoRan.current = key;
     const base = /^[0-9a-f-]{36}$/i.test(params.get('base') || '') ? params.get('base') : undefined;
     setParams({}, { replace: true });
     run(params.get('url'), strategy, base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, authReady]);
 
   const reset = () => {
     resetScan();
@@ -191,6 +208,7 @@ export default function Analyzer() {
 
   return (
     <div className="space-y-6">
+      <SignInModal open={!!pendingRun && !user} onClose={() => setPendingRun(null)} message="Sign in to analyze this website – your scan will start automatically right after you sign in." />
       <section className="hero-surface animate-fade-up px-5 py-8 sm:px-10 sm:py-12">
         <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />

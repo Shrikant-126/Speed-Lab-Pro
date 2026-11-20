@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Sun, Moon, Monitor, RefreshCw, CheckCircle2, XCircle, MinusCircle, LogIn, LogOut, Mail, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Sun, Moon, Monitor, RefreshCw, CheckCircle2, XCircle, MinusCircle, LogOut, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { getSupabase } from '../lib/supabase.js';
+import SignInForm from '../components/SignInForm.jsx';
 import { Card, CardHeader, PageHeader, Button, Notice, ErrorState, Select, cx, Skeleton, KeyValue } from '../components/ui.jsx';
 
 function Status({ ok, label, detail }) {
@@ -19,13 +20,6 @@ function Status({ ok, label, detail }) {
 
 function AccountCard() {
   const { supabaseEnabled, user } = useApp();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mode, setMode] = useState('signin');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
-  const [err, setErr] = useState(null);
-
   if (!supabaseEnabled) {
     return (
       <Card id="account">
@@ -36,31 +30,6 @@ function AccountCard() {
       </Card>
     );
   }
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    setMsg(null);
-    try {
-      const sb = await getSupabase();
-      if (mode === 'magic') {
-        const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
-        if (error) throw error;
-        setMsg('Check your inbox for the sign-in link.');
-      } else if (mode === 'signup') {
-        const { error } = await sb.auth.signUp({ email, password });
-        if (error) throw error;
-        setMsg('Account created. Confirm your email if confirmation is enabled, then sign in.');
-      } else {
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      }
-    } catch (e2) {
-      setErr(e2.message);
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <Card id="account">
       <CardHeader title="Account" subtitle={user ? `Signed in as ${user.email}` : 'Sign in to save scans, projects and reports'} />
@@ -70,16 +39,7 @@ function AccountCard() {
             Sign out
           </Button>
         ) : (
-          <form onSubmit={submit} className="max-w-sm space-y-3">
-            <Select value={mode} onChange={setMode} options={[{ value: 'signin', label: 'Sign in with password' }, { value: 'signup', label: 'Create account' }, { value: 'magic', label: 'Email magic link' }]} />
-            <input className="input" type="email" required placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-            {mode !== 'magic' && <input className="input" type="password" required minLength={8} placeholder="Password (min. 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />}
-            <Button type="submit" icon={mode === 'magic' ? Mail : LogIn} loading={busy}>
-              {mode === 'signup' ? 'Create account' : mode === 'magic' ? 'Send link' : 'Sign in'}
-            </Button>
-            {msg && <Notice>{msg}</Notice>}
-            {err && <ErrorState title="Authentication failed" message={err} />}
-          </form>
+          <div className="max-w-sm"><SignInForm /></div>
         )}
       </div>
     </Card>
