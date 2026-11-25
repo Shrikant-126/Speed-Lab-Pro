@@ -14,6 +14,7 @@ import { analyzeThirdParty } from './thirdParty.js';
 import { analyzeCls } from './cls.js';
 import { detectPlatform } from './platform.js';
 import { analyzeSeo } from './seo.js';
+import { analyzeVisual } from './visual.js';
 import { PRIORITY_WEIGHT } from '../thresholds.js';
 
 export const REPORT_VERSION = 1;
@@ -52,6 +53,7 @@ export function buildReport(input) {
   const thirdParty = analyzeThirdParty({ lhr, requests, inspection });
   const cls = analyzeCls({ lhr, inspection, clsValue: lab.cls.value ?? field?.metrics?.cls?.p75 });
   const platform = detectPlatform({ html: probe?.html || '', headers: probe?.headers || {}, requests });
+  const visual = analyzeVisual({ lhr });
   const seo = analyzeSeo({ lhr, probe, seoFiles: input.seoFiles, requests, finalUrl, platform });
 
   const issues = [
@@ -109,6 +111,7 @@ export function buildReport(input) {
     cls: strip(cls),
     seo: strip(seo),
     platform,
+    visual,
     resources: { summary: resourceSummary, requests: requests.slice(0, 400) },
     issues: uniqueIssues,
     issueCounts: uniqueIssues.reduce((acc, i) => ({ ...acc, [i.priority]: (acc[i.priority] || 0) + 1 }), {}),

@@ -10,6 +10,7 @@ import MetricCard from '../components/MetricCard.jsx';
 import IssueCard from '../components/IssueCard.jsx';
 import Slider3D from '../components/Slider3D.jsx';
 import GlowAreaChart from '../components/GlowAreaChart.jsx';
+import PageFilmstrip, { DeviceShot, finalShotOf } from '../components/PageFilmstrip.jsx';
 import { Card, CardHeader, Badge, Stat, Button, Notice, Tabs, cx } from '../components/ui.jsx';
 import { formatBytes, formatMetric } from '@speedlab/shared/format';
 import { rateMetric } from '@speedlab/shared/thresholds';
@@ -79,12 +80,15 @@ function Hero({ report }) {
         </div>
 
         <div className="flex flex-col items-center gap-5">
-          <div className="relative">
-            <div className="absolute inset-8 rounded-full bg-brand-400/10 blur-2xl" />
-            <div className="[&_.text-slate-900]:text-white">
-              <ScoreGauge score={s.performance} size={230} />
+          <div className={cx('flex w-full flex-col items-center gap-6', finalShotOf(report) && 'sm:flex-row sm:justify-center')}>
+            <div className="relative">
+              <div className="absolute inset-8 rounded-full bg-brand-400/10 blur-2xl" />
+              <div className="[&_.text-slate-900]:text-white">
+                <ScoreGauge score={s.performance} size={230} />
+              </div>
+              <p className="absolute inset-x-0 bottom-3 text-center text-xs font-medium uppercase tracking-[0.2em] text-white/55">Performance score</p>
             </div>
-            <p className="absolute inset-x-0 bottom-3 text-center text-xs font-medium uppercase tracking-[0.2em] text-white/55">Performance score</p>
+            <DeviceShot report={report} className={report.strategy === 'desktop' ? 'w-full max-w-[300px]' : ''} />
           </div>
           <div className="grid w-full max-w-md grid-cols-3 gap-3">
             {[['Accessibility', s.accessibility, null], ['Best Practices', s.bestPractices, null], ['SEO', s.seo, '/seo']].map(([l, v, to]) => {
@@ -220,6 +224,7 @@ export default function Overview() {
         return (
           <div className="space-y-6">
             <Hero report={report} />
+            <PageFilmstrip report={report} reports={reports} />
             {report.warnings?.filter((w) => !w.startsWith('Lite scan (Vercel)')).length > 0 && (
               <Notice tone="warn">
                 <ul className="list-disc space-y-0.5 pl-4">

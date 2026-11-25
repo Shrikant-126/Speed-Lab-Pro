@@ -206,3 +206,25 @@ test('broken link extraction and framework fixes', async () => {
   assert.match(next[0].snippets[0].after, /next\/image/);
   assert.match(next[0].snippets[0].after, /priority/);
 });
+
+test('visual: final screenshot and filmstrip come from Lighthouse audits only', async () => {
+  const { analyzeVisual } = await import('../src/analysis/visual.js');
+  const img = 'data:image/jpeg;base64,AAAA';
+  const v = analyzeVisual({
+    lhr: {
+      configSettings: { formFactor: 'desktop', screenEmulation: { width: 1350, height: 940 } },
+      audits: {
+        'final-screenshot': { details: { type: 'screenshot', timing: 1234.5, data: img } },
+        'screenshot-thumbnails': { details: { items: [{ timing: 300, data: img }, { timing: 600, data: 'not-an-image' }, { timing: 900.4, data: img }] } },
+      },
+    },
+  });
+  assert.equal(v.formFactor, 'desktop');
+  assert.deepEqual(v.viewport, { width: 1350, height: 940 });
+  assert.equal(v.finalScreenshot.timing, 1235);
+  assert.deepEqual(v.filmstrip.map((f) => f.timing), [300, 900]);
+  const empty = analyzeVisual({ lhr: null });
+  assert.equal(empty.available, false);
+  assert.equal(empty.finalScreenshot, null);
+  assert.deepEqual(empty.filmstrip, []);
+});
