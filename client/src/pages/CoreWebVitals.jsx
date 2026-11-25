@@ -4,6 +4,7 @@ import { formatMetric } from '@speedlab/shared/format';
 import RequireReport from '../components/RequireReport.jsx';
 import MetricCard from '../components/MetricCard.jsx';
 import IssueCard from '../components/IssueCard.jsx';
+import MetricDiagnosis from '../components/MetricDiagnosis.jsx';
 import { Card, CardHeader, PageHeader, RatingBadge, Notice, Badge, SourceTag } from '../components/ui.jsx';
 
 function Distribution({ d }) {
@@ -68,6 +69,8 @@ export default function CoreWebVitals() {
                 </p>
               )}
             </Card>
+
+            <MetricDiagnosis report={report} />
 
             <div>
               <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">

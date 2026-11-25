@@ -228,3 +228,30 @@ test('visual: final screenshot and filmstrip come from Lighthouse audits only', 
   assert.equal(empty.finalScreenshot, null);
   assert.deepEqual(empty.filmstrip, []);
 });
+
+test('diagnosis: CLS culprits keep their element rect and get a popup/bar explanation', async () => {
+  const { diagnoseMetrics } = await import('../src/analysis/diagnose.js');
+  const img = 'data:image/webp;base64,AAAA';
+  const lhr = {
+    configSettings: { formFactor: 'desktop' },
+    fullPageScreenshot: { screenshot: { data: img, width: 1350, height: 3000 }, nodes: { 'page-1-DIV': { left: 225, top: 1340, width: 900, height: 563 } } },
+    audits: {
+      'cls-culprits-insight': {
+        details: {
+          type: 'list',
+          items: [{ type: 'table', items: [
+            { node: { type: 'text', value: 'Total' }, score: 0.02 },
+            { score: 0.02, node: { type: 'node', lhId: 'page-1-DIV', selector: 'div.needsclick', snippet: '<div class="needsclick kl-form">', nodeLabel: 'SHOP THE NEXT DROP', boundingRect: { left: 225, top: 189, width: 900, height: 563 } } },
+          ] }],
+        },
+      },
+    },
+  };
+  const d = diagnoseMetrics({ lhr, lab: { cls: { value: 0.02 } }, field: { metrics: { cls: { p75: 0.51, rating: 'poor' } } }, lcp: null });
+  assert.equal(d.screenshot.kind, 'full-page');
+  assert.equal(d.metrics.cls.items.length, 1);
+  assert.equal(d.metrics.cls.items[0].cause, 'Popup / signup form appearing');
+  assert.deepEqual(d.metrics.cls.items[0].element.rect, { left: 225, top: 1340, width: 900, height: 563 });
+  assert.ok(d.metrics.cls.note, 'field-only CLS note');
+  assert.deepEqual(diagnoseMetrics({ lhr: null }).metrics.cls.items, []);
+});
