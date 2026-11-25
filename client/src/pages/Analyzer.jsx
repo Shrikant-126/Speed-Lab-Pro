@@ -123,7 +123,7 @@ export default function Analyzer() {
   const { startScan, cancelScan, resetScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines, supabaseEnabled, authReady, user } = useApp();
   const [params, setParams] = useSearchParams();
   const [url, setUrl] = useState(() => params.get('url') || '');
-  const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'mobile'));
+  const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'both'));
   const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -183,7 +183,7 @@ export default function Analyzer() {
     setUrl('');
     setLocalError(null);
     setSubmitting(false);
-    setStrategy(defaultStrategy || 'mobile');
+    setStrategy(defaultStrategy || 'both');
     document.getElementById('url')?.focus();
   };
 

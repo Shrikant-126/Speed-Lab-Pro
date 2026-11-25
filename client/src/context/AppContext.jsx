@@ -281,7 +281,7 @@ export function AppProvider({ children }) {
       cancelScan,
       resetScan,
       baselines,
-      defaultStrategy: readLS(LS_DEFAULT_STRATEGY, 'mobile'),
+      defaultStrategy: readLS(LS_DEFAULT_STRATEGY, 'both'),
       setDefaultStrategy: (s) => writeLS(LS_DEFAULT_STRATEGY, s),
     }),
     [theme, session, authReady, health, healthError, refreshHealth, reports, report, device, reportsLoading, reportsError, loadScan, putReport, jobs, scanning, scanError, startScan, cancelScan, resetScan, baselines],
