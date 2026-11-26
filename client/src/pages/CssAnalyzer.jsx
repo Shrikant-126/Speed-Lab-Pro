@@ -3,7 +3,8 @@ import { formatBytes, formatMs, shortUrl, fileName } from '@speedlab/shared/form
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
 import ResourceHints from '../components/ResourceHints.jsx';
-import { Card, CardHeader, PageHeader, Stat, Badge, EmptyState } from '../components/ui.jsx';
+import { jumpTo, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
+import { Card, CardHeader, PageHeader, Badge, EmptyState } from '../components/ui.jsx';
 
 function UnusedBar({ percent, bytes }) {
   if (percent == null) return <span className="text-slate-400">Unavailable</span>;
@@ -32,17 +33,20 @@ function CssPage({ report }) {
     <div className="space-y-6">
       <PageHeader icon={Palette} title="CSS Analyzer" description="Render-blocking, unused, large and duplicate CSS, @import chains, selector counts and web-font loading." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Stylesheets" value={t.count ?? files.length} />
-        <Stat label="CSS transferred" value={formatBytes(t.bytes)} />
-        <Stat label="Unused CSS" hint="Uncompressed bytes" value={formatBytes(t.unusedBytes)} tone="text-amber-600 dark:text-amber-400" />
-        <Stat label="Render-blocking" value={t.renderBlocking ?? 0} tone={t.renderBlocking ? 'text-red-600 dark:text-red-400' : undefined} />
-        <Stat label="Inline CSS" value={t.inlineStyleBytes == null ? 'Unavailable' : formatBytes(t.inlineStyleBytes)} hint="Critical CSS indicator" />
+        <JumpStat target="css-files" label="Stylesheets" value={t.count ?? files.length} />
+        <JumpStat target="css-files" label="CSS transferred" value={formatBytes(t.bytes)} />
+        <JumpStat target="css-unused" label="Unused CSS" hint="Click to see which files" value={formatBytes(t.unusedBytes)} tone="text-amber-600 dark:text-amber-400" />
+        <JumpStat target="css-render-blocking" label="Render-blocking" hint="CSS files · click for details" value={t.renderBlocking ?? 0} tone={t.renderBlocking ? 'text-red-600 dark:text-red-400' : undefined} />
+        <JumpStat target="css-files" label="Inline CSS" value={t.inlineStyleBytes == null ? 'Unavailable' : formatBytes(t.inlineStyleBytes)} hint="Critical CSS indicator" />
       </div>
+
+      <UnusedFilesCard id="css-unused" files={files} kind="css" />
+      <RenderBlockingCard id="css-render-blocking" report={report} />
 
       <ResourceHints report={report} />
 
-      <Card>
-        <CardHeader title="Stylesheets" subtitle="Unused bytes come from Lighthouse or Chrome CSS coverage" />
+      <Card id="css-files" className="scroll-mt-20">
+        <CardHeader title="All stylesheets" subtitle="Unused bytes come from Lighthouse or Chrome CSS coverage · click a red value for details" />
         {files.length ? (
           <div className="overflow-x-auto p-2">
             <table className="table">
@@ -66,8 +70,8 @@ function CssPage({ report }) {
                       {f.thirdParty && <Badge tone="violet" className="mt-0.5">3rd party</Badge>}
                     </td>
                     <td className="tabular-nums">{f.transferSize != null ? formatBytes(f.transferSize) : '—'}</td>
-                    <td>{f.renderBlocking ? <Badge tone="red">Yes{f.blockingMs ? ` · ${formatMs(f.blockingMs)}` : ''}</Badge> : <Badge tone="green">No</Badge>}</td>
-                    <td><UnusedBar percent={f.unusedPercent} bytes={f.unusedBytes} /></td>
+                    <td>{f.renderBlocking ? <button type="button" onClick={() => jumpTo('css-render-blocking')}><Badge tone="red">Yes{f.blockingMs ? ` · ${formatMs(f.blockingMs)}` : ''} →</Badge></button> : <Badge tone="green">No</Badge>}</td>
+                    <td>{f.unusedBytes ? <button type="button" className="w-full text-left" onClick={() => jumpTo('css-unused')}><UnusedBar percent={f.unusedPercent} bytes={f.unusedBytes} /></button> : <UnusedBar percent={f.unusedPercent} bytes={f.unusedBytes} />}</td>
                     <td className="tabular-nums">{f.selectors != null ? f.selectors.toLocaleString() : '—'}</td>
                     <td>{f.imports?.length ? <Badge tone="amber">{f.imports.length}</Badge> : '—'}</td>
                     <td className="tabular-nums">{f.duplicateRules != null ? f.duplicateRules : '—'}</td>

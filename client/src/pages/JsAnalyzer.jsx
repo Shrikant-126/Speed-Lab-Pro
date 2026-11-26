@@ -3,7 +3,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { formatBytes, formatMs, shortUrl, fileName } from '@speedlab/shared/format';
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
-import { Card, CardHeader, PageHeader, Stat, Badge, EmptyState, KeyValue } from '../components/ui.jsx';
+import { jumpTo, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
+import { Card, CardHeader, PageHeader, Badge, EmptyState, KeyValue } from '../components/ui.jsx';
 
 const LOADING_TONE = { 'sync-head': 'red', 'sync-body': 'amber', defer: 'green', async: 'blue', module: 'violet' };
 
@@ -17,20 +18,24 @@ function JsPage({ report }) {
   const L = js.listeners;
   const M = js.mutations;
   const C = js.cdpMetrics;
+  const rbCount = files.filter((f) => f.renderBlocking).length;
 
   return (
     <div className="space-y-6">
       <PageHeader icon={FileCode2} title="JavaScript Analyzer" description="Bundle sizes, unused code, execution cost, long tasks, render-blocking scripts, duplicates, event listeners and DOM work." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Scripts" value={t.count ?? files.length} />
-        <Stat label="JS transferred" value={formatBytes(t.bytes)} />
-        <Stat label="Unused JS" value={formatBytes(t.unusedBytes)} tone="text-amber-600 dark:text-amber-400" />
-        <Stat label="Execution time" value={t.bootupMs ? formatMs(t.bootupMs) : 'Unavailable'} />
-        <Stat label="DOM elements" value={t.domNodes != null ? Math.round(t.domNodes).toLocaleString() : 'Unavailable'} />
+        <JumpStat target="js-scripts" label="Scripts" value={t.count ?? files.length} hint={rbCount ? `${rbCount} render-blocking` : 'none render-blocking'} />
+        <JumpStat target="js-scripts" label="JS transferred" value={formatBytes(t.bytes)} />
+        <JumpStat target="js-unused" label="Unused JS" value={formatBytes(t.unusedBytes)} hint="Click to see which files" tone="text-amber-600 dark:text-amber-400" />
+        <JumpStat target="js-mainthread" label="Execution time" value={t.bootupMs ? formatMs(t.bootupMs) : 'Unavailable'} hint="Click for the slowest scripts" />
+        <JumpStat target="js-recommendations" label="DOM elements" value={t.domNodes != null ? Math.round(t.domNodes).toLocaleString() : 'Unavailable'} />
       </div>
 
+      <UnusedFilesCard id="js-unused" files={files} kind="js" minBytes={5 * 1024} />
+      <RenderBlockingCard id="js-render-blocking" report={report} />
+
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
+        <Card id="js-mainthread" className="scroll-mt-20">
           <CardHeader icon={Cpu} title="Main-thread work breakdown" subtitle={t.mainThreadMs ? `Total ${formatMs(t.mainThreadMs)} (Lighthouse)` : 'Lighthouse lab data'} />
           <div className="h-72 p-4">
             {mainThread.length ? (
@@ -74,8 +79,8 @@ function JsPage({ report }) {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader title="Scripts" subtitle="Sorted by transfer size" />
+      <Card id="js-scripts" className="scroll-mt-20">
+        <CardHeader title="All scripts" subtitle="Sorted by transfer size · click the file name to open it" />
         {files.length ? (
           <div className="overflow-x-auto p-2">
             <table className="table">
@@ -98,10 +103,10 @@ function JsPage({ report }) {
                       {f.thirdParty && <Badge tone="violet" className="mt-0.5">{f.entity || '3rd party'}</Badge>}
                     </td>
                     <td className="tabular-nums">{f.transferSize != null ? formatBytes(f.transferSize) : '—'}</td>
-                    <td className="tabular-nums">{f.unusedBytes != null ? `${formatBytes(f.unusedBytes)} (${(f.unusedPercent ?? 0).toFixed(0)}%)` : '—'}</td>
+                    <td className="tabular-nums">{f.unusedBytes ? <button type="button" className="text-amber-600 underline decoration-dotted hover:text-amber-500 dark:text-amber-400" onClick={() => jumpTo('js-unused')}>{formatBytes(f.unusedBytes)} ({(f.unusedPercent ?? 0).toFixed(0)}%)</button> : f.unusedBytes === 0 ? '0' : '—'}</td>
                     <td className="tabular-nums">{f.bootupMs != null ? formatMs(f.bootupMs) : '—'}</td>
                     <td>{f.loading ? <Badge tone={LOADING_TONE[f.loading]}>{f.loading}</Badge> : '—'}</td>
-                    <td>{f.renderBlocking ? <Badge tone="red">Yes</Badge> : <Badge tone="green">No</Badge>}</td>
+                    <td>{f.renderBlocking ? <button type="button" onClick={() => jumpTo('js-render-blocking')}><Badge tone="red">Yes{f.blockingMs ? ` · ${formatMs(f.blockingMs)}` : ''} →</Badge></button> : <Badge tone="green">No</Badge>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -136,7 +141,7 @@ function JsPage({ report }) {
         )}
       </Card>
 
-      <div className="space-y-3">
+      <div id="js-recommendations" className="scroll-mt-20 space-y-3">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">JavaScript recommendations ({issues.length})</h2>
         {issues.length ? issues.map((i) => <IssueCard key={i.id} issue={i} report={report} />) : <EmptyState title="No JavaScript issues found" />}
       </div>
