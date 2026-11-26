@@ -1,7 +1,8 @@
 // Image optimizer analysis: merges DOM inspection (rendered vs natural size, attributes),
 // Lighthouse image audits, request sizes, and Sharp re-encoding measurements.
 
-import { audit, rows, urlOf, subItems, nodes, sameResource, normUrl } from './lhr.js';
+import { audit, rows, urlOf, subItems, nodes, sameResource, normUrl, attrFromSnippet } from './lhr.js';
+import { parseLhDims, lhReasonCodes } from './imagePlan.js';
 import { makeIssue, priorityFromSavings } from './issue.js';
 
 function formatOf(mime, url) {
@@ -15,10 +16,11 @@ function formatOf(mime, url) {
 function lhImageFindings(lhr) {
   // url -> { wastedBytes, reasons:Set, totalBytes }
   const map = new Map();
-  const add = (url, totalBytes, wasted, reason) => {
+  const add = (url, totalBytes, wasted, reason, node) => {
     if (!url) return;
     const key = normUrl(url);
-    const e = map.get(key) || { totalBytes: 0, wastedBytes: 0, reasons: new Set() };
+    const e = map.get(key) || { totalBytes: 0, wastedBytes: 0, reasons: new Set(), node: null };
+    if (!e.node && node?.type === 'node') e.node = node;
     e.totalBytes = Math.max(e.totalBytes, totalBytes || 0);
     e.wastedBytes = Math.max(e.wastedBytes, wasted || 0);
     if (reason) e.reasons.add(reason);
@@ -27,8 +29,8 @@ function lhImageFindings(lhr) {
   const delivery = audit(lhr, 'image-delivery-insight');
   for (const it of rows(delivery)) {
     const subs = subItems(it);
-    if (subs.length) for (const s of subs) add(urlOf(it), it.totalBytes, it.wastedBytes, s.reason || null);
-    else add(urlOf(it), it.totalBytes, it.wastedBytes, null);
+    if (subs.length) for (const s of subs) add(urlOf(it), it.totalBytes, it.wastedBytes, s.reason || null, it.node);
+    else add(urlOf(it), it.totalBytes, it.wastedBytes, null, it.node);
   }
   const legacy = [
     ['uses-responsive-images', 'Image is larger than its displayed size'],
@@ -38,7 +40,7 @@ function lhImageFindings(lhr) {
     ['efficient-animated-content', 'Use video instead of animated GIF'],
   ];
   for (const [id, reason] of legacy) {
-    for (const it of rows(audit(lhr, id))) add(urlOf(it), it.totalBytes, it.wastedBytes, reason);
+    for (const it of rows(audit(lhr, id))) add(urlOf(it), it.totalBytes, it.wastedBytes, reason, it.node);
   }
   return map;
 }
@@ -73,7 +75,8 @@ function classifyRole(img, viewportW) {
 
 export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageUrl }) {
   const viewportW = inspection?.viewport?.width || 412;
-  const dpr = Math.min(inspection?.viewport?.dpr || 2, 2);
+  const lhDpr = lhr?.configSettings?.screenEmulation?.deviceScaleFactor || (lhr?.configSettings?.formFactor === 'desktop' ? 1 : 1.75);
+  const dpr = Math.min(inspection?.viewport?.dpr || lhDpr || 2, 2);
   const lhFindings = lhImageFindings(lhr);
   const unsized = unsizedSelectors(lhr);
   const clsSel = clsImageSelectors(inspection, lhr);
@@ -126,6 +129,25 @@ export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageU
   }
   for (const [url] of lhFindings) push({ url, selector: null, natural: null, rendered: null, aboveFold: null, attrs: {}, isBackground: null, snippet: null });
 
+  // Without browser inspection (Lite scan) fill selector, markup and attributes from Lighthouse's node.
+  for (const img of byUrl.values()) {
+    if (img.selector || img.snippet) continue;
+    const node = lhFindings.get(normUrl(img.url))?.node;
+    if (!node) continue;
+    img.fromLighthouse = true;
+    img.selector = node.selector || null;
+    img.snippet = node.snippet || null;
+    if (/^<img/i.test(node.snippet || '')) {
+      img.isBackground = false;
+      const attrs = {};
+      for (const a of ['width', 'height', 'loading', 'decoding', 'fetchpriority', 'srcset', 'sizes', 'class', 'alt']) {
+        const v = attrFromSnippet(node.snippet, a);
+        if (v !== null) attrs[a] = v;
+      }
+      img.attrs = attrs;
+    }
+  }
+
   const images = [];
   for (const img of byUrl.values()) {
     const req = reqFor(img.url);
@@ -133,7 +155,10 @@ export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageU
     const probe = imageProbe?.[img.url] || null;
     const format = probe?.format || formatOf(req?.mimeType, img.url);
     const transferSize = req?.transferSize ?? lh?.totalBytes ?? probe?.bytes ?? null;
-    const natural = img.natural?.w ? img.natural : probe ? { w: probe.width, h: probe.height } : null;
+    const lhDims = parseLhDims(lh ? [...lh.reasons] : []);
+    const natural = img.natural?.w ? img.natural : probe ? { w: probe.width, h: probe.height } : lhDims?.file || null;
+    if (!img.rendered?.w && lhDims) img.rendered = lhDims.displayed;
+    const lhCodes = new Set(lhReasonCodes(lh ? [...lh.reasons] : [], probe?.format || formatOf(req?.mimeType, img.url)));
     const isLcp = !!lcpImageUrl && sameResource(img.url, lcpImageUrl);
     const out = {
       ...img,
@@ -165,12 +190,12 @@ export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageU
         const areaRatio = (targetW * targetW * ratio) / (nw * natural.h || 1);
         out.recommended.estimatedResizedBytes = transferSize ? Math.round(transferSize * Math.min(1, areaRatio)) : null;
       }
-    } else if (lh?.reasons.has('Image is larger than its displayed size')) {
+    } else if (lhCodes.has('oversized')) {
       out.issues.push('oversized');
     }
     // Missing dimensions
     const hasAttrsWH = !!(out.attrs.width && out.attrs.height);
-    if (!out.isBackground && out.attrs && Object.keys(out.attrs).length && !hasAttrsWH && !out.hasCssSize) out.issues.push('missing-dimensions');
+    if (!out.fromLighthouse && !out.isBackground && out.attrs && Object.keys(out.attrs).length && !hasAttrsWH && !out.hasCssSize) out.issues.push('missing-dimensions');
     else if (img.selector && unsized.has(img.selector)) out.issues.push('missing-dimensions');
     // Missing srcset / sizes
     if (!out.isBackground && !isVector && rw >= 150 && Object.keys(out.attrs).length && !out.attrs.srcset && !(out.pictureSources || []).length) {
@@ -180,34 +205,39 @@ export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageU
     }
     // Modern formats
     const pictureHasModern = (out.pictureSources || []).some((s) => /avif|webp/.test(s.type || ''));
-    if (['jpeg', 'png', 'gif', 'bmp'].includes(format) && (transferSize ?? 0) > 15_000 && !pictureHasModern) {
+    if ((['jpeg', 'png', 'gif', 'bmp'].includes(format) && (transferSize ?? 0) > 15_000 && !pictureHasModern) || lhCodes.has('legacy-format')) {
       out.issues.push('legacy-format');
       out.recommended.format = format === 'png' && probe?.hasAlpha ? 'webp' : 'avif';
     }
     // Compression
     if (probe?.optimizedBytes && transferSize && probe.optimizedBytes < transferSize * 0.8 && transferSize > 20_000) {
       out.issues.push('poor-compression');
-    } else if (lh?.reasons.has('Image could be compressed more')) out.issues.push('poor-compression');
+    } else if (lhCodes.has('poor-compression')) out.issues.push('poor-compression');
     // Lazy loading
     if (!out.isBackground && out.aboveFold === true && out.attrs.loading === 'lazy') out.issues.push('lazy-above-fold');
     if (!out.isBackground && out.aboveFold === false && out.attrs.loading !== 'lazy' && (transferSize ?? 0) > 5_000) out.issues.push('not-lazy');
-    else if (lh?.reasons.has('Offscreen image should be lazy-loaded')) out.issues.push('not-lazy');
+    else if (lhCodes.has('not-lazy') && out.attrs.loading !== 'lazy') out.issues.push('not-lazy');
     // LCP image priority
     if (isLcp && out.attrs.fetchpriority !== 'high') out.issues.push('lcp-no-fetchpriority');
     // Layout shift
     if (img.selector && clsSel.has(img.selector)) out.issues.push('causes-cls');
-    if (lh?.reasons.has('Use video instead of animated GIF')) out.issues.push('animated-gif');
+    if (lhCodes.has('animated-gif')) out.issues.push('animated-gif');
 
     // Estimated savings
     const candidates = [out.probe?.avifBytes, out.probe?.webpBytes, out.probe?.optimizedBytes, out.recommended.estimatedResizedBytes].filter(
       (x) => typeof x === 'number' && x > 0,
     );
-    if (candidates.length && transferSize) {
+    if (out.probe && candidates.length && transferSize) {
       out.estimatedBytes = Math.min(...candidates);
-      out.estimatedSource = out.probe ? 'measured (Sharp re-encode)' : 'estimate (pixel-area ratio)';
+      out.estimatedSource = 'measured (Sharp re-encode)';
     } else if (lh?.wastedBytes && transferSize) {
-      out.estimatedBytes = Math.max(0, transferSize - lh.wastedBytes);
+      // Lighthouse measures wasted bytes against its own transfer size; keep the ratio.
+      const ratio = lh.totalBytes ? Math.min(1, lh.wastedBytes / lh.totalBytes) : Math.min(1, lh.wastedBytes / transferSize);
+      out.estimatedBytes = Math.max(0, Math.round(transferSize * (1 - ratio)));
       out.estimatedSource = 'Lighthouse estimate';
+    } else if (candidates.length && transferSize) {
+      out.estimatedBytes = Math.min(...candidates);
+      out.estimatedSource = 'estimate (pixel-area ratio)';
     } else out.estimatedBytes = null;
     out.savingsBytes = out.estimatedBytes !== null && transferSize ? Math.max(0, transferSize - out.estimatedBytes) : 0;
 

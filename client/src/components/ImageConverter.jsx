@@ -111,7 +111,7 @@ function readDims(url) {
 
 const pct = (a, b) => (a ? Math.round((1 - b / a) * 100) : 0);
 
-export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
+export default function ImageConverter({ initialUrl = null, initialWidth = null, onConsumedUrl }) {
   // item: { id, file?, name, size, url, dims, state: ready|queued|converting|done|error, result, error, progress }
   const [items, setItems] = useState([]);
   const [formats, setFormats] = useState(['webp', 'avif', 'original']);
@@ -137,6 +137,10 @@ export default function ImageConverter({ initialUrl = null, onConsumedUrl }) {
     const name = decodeURIComponent(initialUrl.split('?')[0].split('/').pop() || 'image');
     setItems((l) => [...l, { id, name, size: null, url: initialUrl, dims: null, state: 'converting' }]);
     const o = options();
+    if (initialWidth) {
+      o.widths = [initialWidth];
+      setWidths(String(initialWidth));
+    }
     api('/images/convert-url', { method: 'POST', body: { url: initialUrl, options: { ...o, widths: o.widths.join(',') } } })
       .then(({ results }) => {
         const r = results[0];

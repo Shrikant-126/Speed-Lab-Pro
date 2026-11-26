@@ -12,6 +12,7 @@
     "./store": "./src/store/index.js",
     "./upload": "./src/upload/index.js",
     "./format": "./src/format.js",
+    "./imagePlan": "./src/analysis/imagePlan.js",
     "./images": "./src/images/convert.js"
   },
   "dependencies": {

@@ -6,6 +6,8 @@ import { optimizedImageMarkup, shopifyImageLiquid, wordpressImagePhp, preloadTag
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
 import ImagePreloadPlan from '../components/ImagePreloadPlan.jsx';
+import ImageActionPlan from '../components/ImageActionPlan.jsx';
+import { imagePlan } from '@speedlab/shared/imagePlan';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Select, Tabs, Notice, EmptyState, KeyValue, Button } from '../components/ui.jsx';
 
@@ -101,6 +103,19 @@ function ImagesPage({ report, onConvert }) {
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState(null);
 
+  const planned = useMemo(
+    () => images
+      .map((img) => ({ img, plan: imagePlan(img, { strategy: report.strategy }) }))
+      .sort((a, b) => (b.plan.savingsBytes || 0) - (a.plan.savingsBytes || 0) || (b.img.isLcp - a.img.isLcp)),
+    [images, report.strategy],
+  );
+  const needWork = planned.filter((x) => x.plan.verdict !== 'ok').length;
+  const planSavings = planned.reduce((s, x) => s + (x.plan.savingsBytes || 0), 0);
+  const showDetails = (url) => {
+    setSelected(url);
+    setTimeout(() => document.getElementById('image-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   const roles = useMemo(() => [...new Set(images.map((i) => i.role).filter(Boolean))], [images]);
   const filtered = images.filter(
     (i) =>
@@ -121,13 +136,15 @@ function ImagesPage({ report, onConvert }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Images analysed" value={totals.count ?? images.length} />
         <Stat label="Image bytes" value={formatBytes(totals.bytes)} />
-        <Stat label="With issues" value={totals.withIssues ?? 0} />
-        <Stat label="Potential savings" value={formatBytes(totals.potentialSavings)} hint={report.sources?.imageProbe ? 'Measured with Sharp where available' : 'Estimate'} tone="text-emerald-600 dark:text-emerald-400" />
+        <Stat label="Need work" value={needWork} hint={`${images.length - needWork} already fine`} />
+        <Stat label="Potential savings" value={formatBytes(planSavings)} hint={report.sources?.imageProbe ? 'Measured with Sharp where available' : 'Lighthouse estimate'} tone="text-emerald-600 dark:text-emerald-400" />
       </div>
 
-      <ImagePreloadPlan report={report} />
+      {sel && <div id="image-detail" className="scroll-mt-20"><ImageDetail img={sel} report={report} onClose={() => setSelected(null)} onConvert={onConvert} /></div>}
 
-      {sel && <ImageDetail img={sel} report={report} onClose={() => setSelected(null)} onConvert={onConvert} />}
+      <ImageActionPlan items={planned} totalBytes={totals.bytes || 0} onConvert={onConvert} onDetails={showDetails} />
+
+      <ImagePreloadPlan report={report} />
 
       <Card>
         <CardHeader title="Images" subtitle={`${filtered.length} of ${images.length} shown · click a row for details and code`} />
@@ -214,6 +231,7 @@ function ImagesPage({ report, onConvert }) {
 export default function ImageOptimizer() {
   const [tab, setTab] = useState('scan');
   const [convertUrl, setConvertUrl] = useState(null);
+  const [convertWidth, setConvertWidth] = useState(null);
   return (
     <div className="space-y-5">
       <Tabs
@@ -227,15 +245,16 @@ export default function ImageOptimizer() {
       {tab === 'convert' ? (
         <>
           <PageHeader icon={Wand2} title="Image Converter" description="Optimize and convert JPG/PNG/WebP/GIF images to WebP, AVIF or compressed JPEG/PNG, with responsive sizes and ready <picture> markup. Your live website is never modified." />
-          <ImageConverter initialUrl={convertUrl} onConsumedUrl={() => setConvertUrl(null)} />
+          <ImageConverter initialUrl={convertUrl} initialWidth={convertWidth} onConsumedUrl={() => { setConvertUrl(null); setConvertWidth(null); }} />
         </>
       ) : (
         <RequireReport title="Image Optimizer">
           {(report) => (
             <ImagesPage
               report={report}
-              onConvert={(u) => {
+              onConvert={(u, w = null) => {
                 setConvertUrl(u);
+                setConvertWidth(w);
                 setTab('convert');
               }}
             />
