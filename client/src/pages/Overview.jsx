@@ -57,13 +57,16 @@ function Hero({ report }) {
             <span className="text-xl text-white/50">/100</span>
           </p>
           <h1 className="mt-1 truncate text-lg font-medium text-white/90" title={report.finalUrl}>{host(report.finalUrl)}</h1>
-          <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-5 border-t border-white/10 pt-5 sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-5 border-t border-white/10 pt-5 sm:grid-cols-3">
             {[
-              ['LCP', <BigValue key="l" metric="lcp" value={report.lab.lcp.value} className="text-3xl" />],
-              ['CLS', <BigValue key="c" metric="cls" value={report.lab.cls.value} className="text-3xl" />],
-              inp !== null ? ['INP (real users)', <BigValue key="i" metric="inp" value={inp} className="text-3xl" />] : ['TBT', <BigValue key="t" metric="tbt" value={report.lab.tbt.value} className="text-3xl" />],
+              ['FCP', <BigValue key="f" metric="fcp" value={report.lab.fcp?.value} className="text-3xl" />],
+              ['LCP', <BigValue key="l" metric="lcp" value={report.lab.lcp?.value} className="text-3xl" />],
+              ['TBT', <BigValue key="t" metric="tbt" value={report.lab.tbt?.value} className="text-3xl" />],
+              ['CLS', <BigValue key="c" metric="cls" value={report.lab.cls?.value} className="text-3xl" />],
+              ['Speed Index', <BigValue key="s" metric="si" value={report.lab.si?.value} className="text-3xl" />],
+              inp !== null && ['INP (real users)', <BigValue key="i" metric="inp" value={inp} className="text-3xl" />],
               ['Page weight', <span key="w" className="num text-3xl text-white">{formatBytes(report.resources.summary.bytes).split(' ')[0]}<span className="ml-1 text-base font-normal text-white/50">{formatBytes(report.resources.summary.bytes).split(' ')[1]}</span></span>],
-            ].map(([label, val]) => (
+            ].filter(Boolean).map(([label, val]) => (
               <div key={label}>
                 <p className="text-xs text-white/55">{label}</p>
                 <p className="mt-1">{val}</p>
