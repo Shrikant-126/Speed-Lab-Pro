@@ -16,7 +16,7 @@ const TABS = [
 const RANK = { poor: 0, 'needs-improvement': 1, good: 2, unavailable: 3 };
 
 /** Crop of the Lighthouse screenshot around one element, with the element outlined. */
-function ElementShot({ shot, rect, maxW = 240, maxH = 170, pad = 24, onClick }) {
+export function ElementShot({ shot, rect, maxW = 240, maxH = 170, pad = 24, onClick }) {
   if (!shot?.data || !rect) {
     return (
       <div className="flex h-24 w-full items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400 dark:border-white/10 sm:w-40">

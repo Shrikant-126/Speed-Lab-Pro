@@ -3,12 +3,13 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { formatBytes, formatMs, shortUrl, fileName } from '@speedlab/shared/format';
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
-import { jumpTo, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
+import { jumpTo, useHashJump, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
 import { Card, CardHeader, PageHeader, Badge, EmptyState, KeyValue } from '../components/ui.jsx';
 
 const LOADING_TONE = { 'sync-head': 'red', 'sync-body': 'amber', defer: 'green', async: 'blue', module: 'violet' };
 
 function JsPage({ report }) {
+  useHashJump();
   const js = report.js || { files: [], totals: {}, mainThread: [], longTasks: [] };
   const files = js.files || [];
   const t = js.totals || {};

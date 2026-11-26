@@ -3,7 +3,7 @@ import { formatBytes, formatMs, shortUrl, fileName } from '@speedlab/shared/form
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
 import ResourceHints from '../components/ResourceHints.jsx';
-import { jumpTo, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
+import { jumpTo, useHashJump, JumpStat, UnusedFilesCard, RenderBlockingCard } from '../components/ResourceBreakdown.jsx';
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from '../components/ui.jsx';
 
 function UnusedBar({ percent, bytes }) {
@@ -23,6 +23,7 @@ function UnusedBar({ percent, bytes }) {
 }
 
 function CssPage({ report }) {
+  useHashJump();
   const css = report.css || { files: [], fonts: [], totals: {} };
   const files = css.files || [];
   const fonts = css.fonts || [];

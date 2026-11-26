@@ -1,5 +1,7 @@
 // Shared CSS/JS sections: "which file is unused and who added it" and "what is render-blocking",
 // plus clickable stat cards that jump to the matching section.
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ExternalLink, Ban, CheckCircle2, ArrowDown, Trash2 } from 'lucide-react';
 import { formatBytes, formatMs, shortUrl, fileName, hostOf } from '@speedlab/shared/format';
 import { Card, CardHeader, Badge, Stat, cx } from './ui.jsx';
@@ -10,6 +12,16 @@ export function jumpTo(id) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   el.classList.add('ring-2', 'ring-brand-400');
   setTimeout(() => el.classList.remove('ring-2', 'ring-brand-400'), 1600);
+}
+
+/** Scroll to #section when the page is opened with a hash (links from Suggestions). */
+export function useHashJump() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return undefined;
+    const t = setTimeout(() => jumpTo(decodeURIComponent(hash.slice(1))), 300);
+    return () => clearTimeout(t);
+  }, [hash]);
 }
 
 /** A Stat card that scrolls to a section when clicked. */

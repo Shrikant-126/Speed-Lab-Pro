@@ -3,6 +3,7 @@ import { Lightbulb, Search, Trash2, Bookmark } from 'lucide-react';
 import { PRIORITY_WEIGHT } from '@speedlab/shared/thresholds';
 import RequireReport from '../components/RequireReport.jsx';
 import IssueCard from '../components/IssueCard.jsx';
+import PsiAudits from '../components/PsiAudits.jsx';
 import { useApp } from '../context/AppContext.jsx';
 import { api } from '../lib/api.js';
 import { PageHeader, Tabs, Select, EmptyState, ErrorState, Skeleton, PriorityBadge, Button, Card, Badge } from '../components/ui.jsx';
@@ -123,12 +124,12 @@ function SavedView() {
 }
 
 export default function Suggestions() {
-  const [tab, setTab] = useState('issues');
+  const [tab, setTab] = useState('psi');
   const { report } = useApp();
   return (
     <div>
-      <PageHeader icon={Lightbulb} title="Optimization Suggestions" description="Evidence-based issues with root cause, impact, priority and copy-ready fixes." actions={<Tabs tabs={[{ key: 'issues', label: 'Scan issues', count: report?.issues?.length }, { key: 'saved', label: 'Saved' }]} value={tab} onChange={setTab} />} />
-      {tab === 'saved' ? <SavedView /> : <RequireReport title="suggestions">{(r) => <IssuesView report={r} />}</RequireReport>}
+      <PageHeader icon={Lightbulb} title="Optimization Suggestions" description="Evidence-based issues with root cause, impact, priority and copy-ready fixes." actions={<Tabs tabs={[{ key: 'psi', label: 'PageSpeed view' }, { key: 'issues', label: 'Detailed issues', count: report?.issues?.length }, { key: 'saved', label: 'Saved' }]} value={tab} onChange={setTab} />} />
+      {tab === 'saved' ? <SavedView /> : <RequireReport title="suggestions">{(r) => (tab === 'psi' ? <PsiAudits report={r} /> : <IssuesView report={r} />)}</RequireReport>}
       {tab === 'issues' && report && <p className="mt-6 text-xs text-slate-400"><Badge tone="slate">Tip</Badge> Use the Code Generator for platform-specific (Shopify / WordPress) variants.</p>}
     </div>
   );

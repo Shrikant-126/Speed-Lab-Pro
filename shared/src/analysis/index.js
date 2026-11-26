@@ -16,6 +16,7 @@ import { detectPlatform } from './platform.js';
 import { analyzeSeo } from './seo.js';
 import { analyzeVisual } from './visual.js';
 import { diagnoseMetrics } from './diagnose.js';
+import { extractAudits } from './audits.js';
 import { PRIORITY_WEIGHT } from '../thresholds.js';
 
 export const REPORT_VERSION = 1;
@@ -115,6 +116,7 @@ export function buildReport(input) {
     platform,
     visual,
     diagnosis,
+    audits: lhr ? extractAudits(lhr) : null,
     resources: { summary: resourceSummary, requests: requests.slice(0, 400) },
     issues: uniqueIssues,
     issueCounts: uniqueIssues.reduce((acc, i) => ({ ...acc, [i.priority]: (acc[i.priority] || 0) + 1 }), {}),
