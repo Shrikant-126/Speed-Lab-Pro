@@ -39,6 +39,11 @@ export function imagePlan(img, { strategy = 'mobile' } = {}) {
   const dpr = strategy === 'desktop' ? 1 : 1.75;
   const reasons = img.lighthouse?.reasons || [];
   const codes = new Set([...(img.issues || []), ...lhReasonCodes(reasons, img.format)]);
+  {
+    const cur = img.transferSize || 0;
+    const best = Math.min(...[img.probe?.optimizedBytes, img.probe?.webpBytes].filter((x) => typeof x === 'number' && x > 0), Infinity);
+    if (cur > 20_000 && best < cur * 0.8 && !codes.has('legacy-format') && !codes.has('animated-gif')) codes.add('poor-compression');
+  }
   const lhDims = parseLhDims(reasons);
   const steps = [];
   let targetWidth = null;
@@ -110,6 +115,7 @@ export function imagePlan(img, { strategy = 'mobile' } = {}) {
   const verdict = hasFile ? 'optimize' : finalSteps.length ? 'fix-markup' : 'ok';
   return {
     verdict,
+    codes: [...codes].filter((c) => hasFile || !['oversized', 'legacy-format', 'poor-compression', 'animated-gif'].includes(c)),
     steps: finalSteps,
     targetWidth: finalSteps.some((s) => s.kind === 'resize') ? targetWidth : null,
     targetFormat: hasFile && !isVector && fmt !== 'gif' ? 'webp' : null,

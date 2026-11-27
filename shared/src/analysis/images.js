@@ -210,7 +210,8 @@ export function analyzeImages({ lhr, inspection, requests, imageProbe, lcpImageU
       out.recommended.format = format === 'png' && probe?.hasAlpha ? 'webp' : 'avif';
     }
     // Compression
-    if (probe?.optimizedBytes && transferSize && probe.optimizedBytes < transferSize * 0.8 && transferSize > 20_000) {
+    const bestProbe = Math.min(...[probe?.optimizedBytes, probe?.webpBytes].filter((x) => typeof x === 'number' && x > 0), Infinity);
+    if (!out.issues.includes('legacy-format') && transferSize && bestProbe < transferSize * 0.8 && transferSize > 20_000) {
       out.issues.push('poor-compression');
     } else if (lhCodes.has('poor-compression')) out.issues.push('poor-compression');
     // Lazy loading

@@ -80,3 +80,10 @@ test('imagePlan never recommends enlarging an image', () => {
   assert.equal(plan.targetWidth, null);
   assert.ok(plan.steps.some((s) => s.kind === 'compress'));
 });
+
+test('imagePlan flags a WebP that Sharp re-encodes much smaller as compressible', () => {
+  const plan = imagePlan({ url: 'https://x/big.webp', format: 'webp', transferSize: 608000, natural: { w: 1697, h: 2560 }, probe: { webpBytes: 179000, optimizedBytes: null, avifBytes: null }, estimatedBytes: 179000, savingsBytes: 429000, issues: [] }, { strategy: 'mobile' });
+  assert.equal(plan.verdict, 'optimize');
+  assert.ok(plan.codes.includes('poor-compression'));
+  assert.equal(plan.savingsBytes, 429000);
+});

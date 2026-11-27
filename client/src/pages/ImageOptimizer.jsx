@@ -9,7 +9,7 @@ import ImagePreloadPlan from '../components/ImagePreloadPlan.jsx';
 import ImageActionPlan from '../components/ImageActionPlan.jsx';
 import { imagePlan } from '@speedlab/shared/imagePlan';
 import CodeBlock from '../components/CodeBlock.jsx';
-import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Select, Tabs, Notice, EmptyState, KeyValue, Button } from '../components/ui.jsx';
+import { Card, CardHeader, PageHeader, Stat, Badge, PriorityBadge, Select, Tabs, Notice, EmptyState, KeyValue, Button, cx } from '../components/ui.jsx';
 
 const ISSUE_LABELS = {
   oversized: 'Oversized',
@@ -109,6 +109,7 @@ function ImagesPage({ report, onConvert }) {
       .sort((a, b) => (b.plan.savingsBytes || 0) - (a.plan.savingsBytes || 0) || (b.img.isLcp - a.img.isLcp)),
     [images, report.strategy],
   );
+  const planByUrl = useMemo(() => new Map(planned.map((x) => [x.img.url, x.plan])), [planned]);
   const needWork = planned.filter((x) => x.plan.verdict !== 'ok').length;
   const planSavings = planned.reduce((s, x) => s + (x.plan.savingsBytes || 0), 0);
   const showDetails = (url) => {
@@ -174,7 +175,7 @@ function ImagesPage({ report, onConvert }) {
               </thead>
               <tbody>
                 {filtered.map((i) => (
-                  <tr key={i.url} className="cursor-pointer" onClick={() => setSelected(i.url)}>
+                  <tr key={i.url} className={cx('cursor-pointer', selected === i.url && 'bg-brand-400/[0.06]')} onClick={() => showDetails(i.url)}>
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
@@ -204,7 +205,10 @@ function ImagesPage({ report, onConvert }) {
                     </td>
                     <td>
                       <div className="flex max-w-[260px] flex-wrap gap-1">
-                        {i.issues.length ? i.issues.map((c) => <Badge key={c} tone="amber">{ISSUE_LABELS[c] || c}</Badge>) : <Badge tone="green">OK</Badge>}
+                        {(() => {
+                          const codes = planByUrl.get(i.url)?.codes || i.issues;
+                          return codes.length ? codes.map((c) => <Badge key={c} tone="amber">{ISSUE_LABELS[c] || c}</Badge>) : <Badge tone="green">OK</Badge>;
+                        })()}
                       </div>
                     </td>
                     <td>{i.priority ? <PriorityBadge priority={i.priority} /> : '—'}</td>
