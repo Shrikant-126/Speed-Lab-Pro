@@ -10,6 +10,25 @@ import SignInModal from '../components/SignInModal.jsx';
 import { formatMetric } from '@speedlab/shared/format';
 import { rateMetric } from '@speedlab/shared/thresholds';
 
+// The URL/device typed in the Analyzer stay filled in (across tabs and reloads) until changed or Reset.
+const LS_URL = 'speedlab:analyzer-url';
+const LS_STRATEGY = 'speedlab:analyzer-strategy';
+const readLs = (k) => {
+  try {
+    return localStorage.getItem(k) || '';
+  } catch {
+    return '';
+  }
+};
+const writeLs = (k, v) => {
+  try {
+    if (v) localStorage.setItem(k, v);
+    else localStorage.removeItem(k);
+  } catch {
+    /* storage blocked – the field just won't be remembered */
+  }
+};
+
 const STEP_ICON = {
   pending: <Circle size={16} className="text-slate-300 dark:text-slate-600" />,
   running: <Loader2 size={16} className="animate-spin text-brand-600" />,
@@ -122,8 +141,13 @@ function ResultSummary({ report, baselineId, onRetest, scanning }) {
 export default function Analyzer() {
   const { startScan, cancelScan, resetScan, jobs, scanning, scanError, reports, defaultStrategy, health, baselines, supabaseEnabled, authReady, user } = useApp();
   const [params, setParams] = useSearchParams();
-  const [url, setUrl] = useState(() => params.get('url') || '');
-  const [strategy, setStrategy] = useState(() => (['mobile', 'desktop', 'both'].includes(params.get('strategy')) ? params.get('strategy') : defaultStrategy || 'both'));
+  const [url, setUrl] = useState(() => params.get('url') || readLs(LS_URL) || reports?.mobile?.finalUrl || reports?.desktop?.finalUrl || '');
+  const [strategy, setStrategy] = useState(() => {
+    const s = params.get('strategy') || readLs(LS_STRATEGY);
+    return ['mobile', 'desktop', 'both'].includes(s) ? s : defaultStrategy || 'both';
+  });
+  useEffect(() => writeLs(LS_URL, url.trim()), [url]);
+  useEffect(() => writeLs(LS_STRATEGY, strategy), [strategy]);
   const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
