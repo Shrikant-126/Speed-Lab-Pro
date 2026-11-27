@@ -73,3 +73,10 @@ test('imagePlan turns Lighthouse reasons into resize/compress steps with target 
   assert.equal(plan.savingsBytes, 139000);
   assert.equal(plan.targetBytes, 31000);
 });
+
+test('imagePlan never recommends enlarging an image', () => {
+  const plan = imagePlan({ url: 'https://x/a.webp', format: 'webp', transferSize: 59000, natural: { w: 768, h: 513 }, rendered: { w: 651, h: 435 }, recommended: { width: 1140, height: 761 }, lighthouse: { wastedBytes: 34000, reasons: ['Image is larger than its displayed size'] }, issues: ['oversized'] }, { strategy: 'mobile' });
+  assert.ok(!plan.steps.some((s) => s.kind === 'resize'));
+  assert.equal(plan.targetWidth, null);
+  assert.ok(plan.steps.some((s) => s.kind === 'compress'));
+});

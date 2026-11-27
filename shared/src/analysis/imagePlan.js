@@ -53,15 +53,25 @@ export function imagePlan(img, { strategy = 'mobile' } = {}) {
 
   // ---- 1. Resize
   const natural = img.natural?.w ? img.natural : lhDims?.file || null;
-  const displayed = img.rendered?.w ? img.rendered : lhDims?.displayed || null;
+  // Lighthouse's displayed size belongs to the same run as its savings claim, so prefer it.
+  const displayed = lhDims?.displayed || (img.rendered?.w ? img.rendered : null);
+  let w = null;
+  let h = null;
   if (codes.has('oversized') && !isVector) {
-    let w = img.recommended?.width;
-    let h = img.recommended?.height;
-    if (!w && displayed?.w) {
+    w = img.recommended?.width;
+    h = img.recommended?.height;
+    if ((!w || (natural?.w && w >= natural.w)) && displayed?.w) {
       w = Math.ceil(displayed.w * dpr);
       const ratio = natural?.w ? natural.h / natural.w : displayed.h / displayed.w;
       h = round(w * ratio);
     }
+    // Never recommend making an image bigger: if the target is not clearly smaller, skip the resize.
+    if (w && natural?.w && w >= natural.w * 0.95) {
+      codes.delete('oversized');
+      if (!codes.has('legacy-format') && !codes.has('animated-gif')) codes.add('poor-compression');
+    }
+  }
+  if (codes.has('oversized') && !isVector) {
     targetWidth = w || null;
     const from = natural?.w ? `${natural.w}×${natural.h} px` : 'the current file';
     steps.push({
@@ -96,14 +106,16 @@ export function imagePlan(img, { strategy = 'mobile' } = {}) {
   const fileStep = (s) => ['resize', 'format', 'compress'].includes(s.kind);
   const worthIt = savings >= 4096 || !current;
   const finalSteps = worthIt ? steps : steps.filter((s) => !fileStep(s));
-  const verdict = finalSteps.some(fileStep) ? 'optimize' : finalSteps.length ? 'fix-markup' : 'ok';
+  const hasFile = finalSteps.some(fileStep);
+  const verdict = hasFile ? 'optimize' : finalSteps.length ? 'fix-markup' : 'ok';
   return {
     verdict,
     steps: finalSteps,
     targetWidth: finalSteps.some((s) => s.kind === 'resize') ? targetWidth : null,
+    targetFormat: hasFile && !isVector && fmt !== 'gif' ? 'webp' : null,
     currentBytes: current,
-    targetBytes: target,
-    savingsBytes: savings,
-    savingsPct: current && savings ? round((savings / current) * 100) : 0,
+    targetBytes: hasFile ? target : null,
+    savingsBytes: hasFile ? savings : 0,
+    savingsPct: hasFile && current && savings ? round((savings / current) * 100) : 0,
   };
 }

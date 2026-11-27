@@ -1,8 +1,31 @@
 // Plain-language, per-image to-do list: optimize or leave it, to what size, and how much it saves.
 import { useState } from 'react';
-import { ListChecks, CheckCircle2, ArrowRight, Wand2, ChevronDown, ChevronUp, Maximize2, FileImage, Code2 } from 'lucide-react';
+import { ListChecks, CheckCircle2, ArrowRight, Wand2, ChevronDown, ChevronUp, Maximize2, FileImage, Code2, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { formatBytes, fileName, shortUrl } from '@speedlab/shared/format';
-import { Card, CardHeader, Badge, Button, cx } from './ui.jsx';
+import { api, downloadBlob } from '../lib/api.js';
+import { Card, CardHeader, Badge, Button, Notice, cx } from './ui.jsx';
+
+const canDownload = (x) => x.plan.verdict === 'optimize' && x.img.format !== 'svg' && x.img.format !== 'gif';
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Convert one scanned image on the server at the recommended width; returns the smallest output. */
+async function optimizeOne(img, plan) {
+  const { results } = await api('/images/convert-url', {
+    method: 'POST',
+    body: { url: img.url, options: { formats: ['webp', 'original'], quality: { webp: 78, avif: 50, jpeg: 80, png: 100 }, widths: plan.targetWidth ? String(plan.targetWidth) : '' } },
+  });
+  const r = results?.[0];
+  if (!r || r.error) throw new Error(r?.error || 'Conversion failed');
+  const best = [...r.outputs].sort((a, b) => a.bytes - b.bytes)[0];
+  if (!best) throw new Error('No output');
+  return { ...best, inputBytes: r.input?.bytes ?? null, inputWidth: r.input?.width ?? null, inputHeight: r.input?.height ?? null };
+}
 
 const STEP_ICON = { resize: Maximize2, format: FileImage, compress: FileImage, markup: Code2 };
 
@@ -14,10 +37,27 @@ function Thumb({ url }) {
   );
 }
 
-function PlanRow({ img, plan, index, onConvert, onDetails }) {
+function RowStatus({ st }) {
+  if (!st) return null;
+  if (st.state === 'working') return <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Loader2 size={13} className="animate-spin" /> Optimizing…</span>;
+  if (st.state === 'error') return <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><AlertTriangle size={13} /> {st.error}</span>;
   return (
-    <li className="rounded-xl border border-slate-200 p-4 dark:border-slate-700/70">
+    <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
+      <CheckCircle2 size={13} /> {st.file.filename} · {st.file.width}×{st.file.height} · {formatBytes(st.file.bytes)}
+      {st.file.inputBytes ? ` (was ${formatBytes(st.file.inputBytes)})` : ''}
+    </span>
+  );
+}
+
+function PlanRow({ img, plan, index, onConvert, onDetails, selectable, checked, onCheck, status }) {
+  return (
+    <li className={cx('rounded-xl border p-4', checked ? 'border-brand-400 bg-brand-400/[0.04]' : 'border-slate-200 dark:border-slate-700/70')}>
       <div className="flex flex-wrap items-start gap-3">
+        {selectable ? (
+          <input type="checkbox" checked={checked} onChange={(e) => onCheck(e.target.checked)} className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-brand-500" aria-label={`Select ${fileName(img.url)} for download`} />
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
         <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-400 text-xs font-bold text-[#04090a]">{index}</span>
         <Thumb url={img.url} />
         <div className="min-w-0 flex-1">
@@ -39,7 +79,7 @@ function PlanRow({ img, plan, index, onConvert, onDetails }) {
           </div>
         ) : null}
       </div>
-      <ol className="mt-3 space-y-2 pl-9">
+      <ol className="mt-3 space-y-2 pl-16">
         {plan.steps.map((s, i) => {
           const Icon = STEP_ICON[s.kind] || Code2;
           return (
@@ -53,11 +93,12 @@ function PlanRow({ img, plan, index, onConvert, onDetails }) {
           );
         })}
       </ol>
-      <div className="mt-3 flex flex-wrap gap-2 pl-9">
+      <div className="mt-3 flex flex-wrap items-center gap-2 pl-16">
         {plan.verdict === 'optimize' && img.format !== 'svg' && (
           <Button size="sm" icon={Wand2} onClick={() => onConvert(img.url, plan.targetWidth)}>{plan.targetWidth ? `Optimize now (resize to ${plan.targetWidth}px + WebP)` : 'Optimize this image now'}</Button>
         )}
         <Button size="sm" variant="secondary" onClick={() => onDetails(img.url)}>Show code</Button>
+        <RowStatus st={status} />
       </div>
     </li>
   );
@@ -69,6 +110,63 @@ export default function ImageActionPlan({ items, totalBytes, onConvert, onDetail
   const ok = items.filter((x) => x.plan.verdict === 'ok');
   const saving = todo.reduce((s, x) => s + (x.plan.savingsBytes || 0), 0);
   const optimizeCount = todo.filter((x) => x.plan.verdict === 'optimize').length;
+  const downloadable = todo.filter(canDownload);
+  const [checked, setChecked] = useState(() => new Set());
+  const [status, setStatus] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const selected = downloadable.filter((x) => checked.has(x.img.url));
+  const allOn = downloadable.length > 0 && selected.length === downloadable.length;
+  const setOne = (url, on) => setChecked((prev) => {
+    const n = new Set(prev);
+    if (on) n.add(url);
+    else n.delete(url);
+    return n;
+  });
+
+  const downloadSelected = async () => {
+    if (!selected.length || busy) return;
+    setBusy(true);
+    setMsg(null);
+    const files = [];
+    for (const x of selected) {
+      setStatus((s) => ({ ...s, [x.img.url]: { state: 'working' } }));
+      try {
+        const file = await optimizeOne(x.img, x.plan);
+        files.push({ x, file });
+        setStatus((s) => ({ ...s, [x.img.url]: { state: 'done', file } }));
+      } catch (e) {
+        setStatus((s) => ({ ...s, [x.img.url]: { state: 'error', error: e.message } }));
+      }
+    }
+    try {
+      if (files.length === 1) {
+        const f = files[0].file;
+        downloadBlob(new Blob([b64ToBytes(f.data)], { type: f.mime }), f.filename);
+      } else if (files.length > 1) {
+        const { default: JSZip } = await import('jszip');
+        const zip = new JSZip();
+        const used = new Set();
+        const lines = ['SpeedLab - optimized images (recommended size, WebP or recompressed original)', ''];
+        for (const { x, file } of files) {
+          let name = file.filename;
+          for (let i = 2; used.has(name); i += 1) name = file.filename.replace(/(\.[a-z0-9]+)$/i, `-${i}$1`);
+          used.add(name);
+          zip.file(name, b64ToBytes(file.data));
+          lines.push(`${name}  ${file.width}x${file.height}  ${formatBytes(file.bytes)}${file.inputBytes ? `  (was ${formatBytes(file.inputBytes)}${file.inputWidth ? `, ${file.inputWidth}x${file.inputHeight}` : ''})` : ''}`);
+          lines.push(`  replaces: ${x.img.url}`, '');
+        }
+        zip.file('README.txt', lines.join('\n'));
+        downloadBlob(await zip.generateAsync({ type: 'blob' }), 'optimized-images.zip');
+      }
+      const failed = selected.length - files.length;
+      setMsg(files.length
+        ? { tone: failed ? 'warn' : 'info', text: `Downloaded ${files.length} optimized image${files.length === 1 ? '' : 's'}${failed ? ` · ${failed} failed (see the red message on each image)` : ''}. Upload them to replace the originals (in WordPress keep the same file name with a plugin like "Enable Media Replace"), then Retest.` }
+        : { tone: 'warn', text: 'No image could be optimized. See the message on each image.' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Card>
@@ -87,10 +185,34 @@ export default function ImageActionPlan({ items, totalBytes, onConvert, onDetail
             {totalBytes ? ` (${Math.round((saving / totalBytes) * 100)}% smaller)` : ''}. That speeds up LCP, FCP and Speed Index, mostly on mobile.
           </div>
         )}
+        {downloadable.length > 0 && (
+          <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-slate-700/70 dark:bg-[#0b1214]/95">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input type="checkbox" checked={allOn} onChange={(e) => setChecked(e.target.checked ? new Set(downloadable.map((x) => x.img.url)) : new Set())} className="h-4 w-4 accent-brand-500" />
+              Select all ({downloadable.length})
+            </label>
+            <span className="text-xs text-slate-500">{selected.length ? `${selected.length} selected · resized to the recommended size, WebP (or recompressed original if smaller)` : 'Tick images to download them optimized'}</span>
+            <Button size="sm" icon={busy ? Loader2 : Download} disabled={!selected.length || busy} onClick={downloadSelected} className={cx('ml-auto', busy && '[&_svg]:animate-spin')}>
+              {busy ? 'Optimizing…' : selected.length > 1 ? `Download ${selected.length} as ZIP` : 'Download selected'}
+            </Button>
+          </div>
+        )}
+        {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
         {todo.length > 0 && (
           <ol className="space-y-3">
             {todo.map((x, i) => (
-              <PlanRow key={x.img.url} img={x.img} plan={x.plan} index={i + 1} onConvert={onConvert} onDetails={onDetails} />
+              <PlanRow
+                key={x.img.url}
+                img={x.img}
+                plan={x.plan}
+                index={i + 1}
+                onConvert={onConvert}
+                onDetails={onDetails}
+                selectable={canDownload(x)}
+                checked={checked.has(x.img.url)}
+                onCheck={(on) => setOne(x.img.url, on)}
+                status={status[x.img.url]}
+              />
             ))}
           </ol>
         )}
