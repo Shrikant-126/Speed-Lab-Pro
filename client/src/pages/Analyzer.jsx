@@ -154,6 +154,17 @@ export default function Analyzer() {
   const [localError, setLocalError] = useState(null);
   const autoRan = useRef(null);
   const formRef = useRef(null);
+  const progressRef = useRef(null);
+  // When a new scan starts, bring the progress cards into view (they sit below the fold on small screens).
+  const jobKey = jobs.map((j) => j.id).join(',');
+  const scrolledFor = useRef('');
+  useEffect(() => {
+    if (!jobKey || scrolledFor.current === jobKey || !jobs.some((j) => ['queued', 'running'].includes(j.status))) return;
+    scrolledFor.current = jobKey;
+    const t = setTimeout(() => progressRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobKey]);
   // Scan requested while signed out – runs automatically right after sign-in.
   const [pendingRun, setPendingRun] = useState(null);
   const needsSignIn = supabaseEnabled && authReady && !user;
@@ -214,7 +225,6 @@ export default function Analyzer() {
   const retest = (r) => {
     setUrl(r.finalUrl || r.url);
     setStrategy(r.strategy);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
     run(r.finalUrl || r.url, r.strategy);
   };
 
@@ -313,7 +323,7 @@ export default function Analyzer() {
       )}
 
       {jobs.length > 0 && (
-        <div className={cx('grid gap-4', jobs.length > 1 && 'lg:grid-cols-2')}>
+        <div ref={progressRef} className={cx('grid scroll-mt-24 gap-4', jobs.length > 1 && 'lg:grid-cols-2')}>
           {jobs.map((j) => (
             <JobProgress key={j.id} job={j} />
           ))}
